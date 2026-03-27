@@ -174,25 +174,6 @@ select option{background:var(--card);color:var(--text)}
 .admin-only{display:none}
 body.is-admin .admin-only{display:inline-flex}
 
-/* ═══ SELECT MODE ═══ */
-.sel-bar{display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;
-  background:rgba(15,15,25,.95);border:1px solid var(--border2);border-radius:10px;
-  padding:6px 12px;gap:8px;align-items:center;backdrop-filter:blur(8px);
-  box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.sel-bar.show{display:flex}
-.sel-bar-count{font-size:11px;font-weight:700;color:var(--accent);font-family:var(--mono);white-space:nowrap}
-.sel-bar-actions{display:flex;gap:4px}
-.sel-bar-btn{padding:4px 9px;border-radius:5px;font-size:9px;font-weight:700;border:1px solid var(--border);
-  cursor:pointer;font-family:var(--mono);background:transparent;color:var(--muted);transition:all .15s;white-space:nowrap}
-.sel-bar-btn:hover{background:var(--hover);color:var(--text)}
-.sel-bar-delete{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#f87171}
-.sel-bar-delete:hover{background:rgba(239,68,68,.2)}
-.sel-bar-clear{color:#94a3b8}
-.node-selected .node-shape,.node-selected polygon,.node-selected rect:first-child,.node-selected ellipse{
-  stroke:#f59e0b !important;stroke-width:3 !important;stroke-dasharray:6,3}
-body.select-mode .node{cursor:crosshair !important}
-body.select-mode .tree-container{cursor:crosshair}
-
 /* Loading */
 .spinner{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -262,7 +243,6 @@ body.select-mode .tree-container{cursor:crosshair}
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="openBOM()" style="background:rgba(22,160,133,.08);border-color:rgba(22,160,133,.2);color:#1abc9c">📋 BOM</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn admin-only" id="selectToggle" onclick="toggleSelectMode()">☐ Select</button>
     <button class="tb-btn admin-only" id="saveBtn" onclick="savePositions()">💾 Save</button>
   </div>
   <div class="tree-wrap">
@@ -280,18 +260,6 @@ body.select-mode .tree-container{cursor:crosshair}
         <button class="nab-btn nab-edit" id="nabEdit" title="Edit">✏️</button>
         <button class="nab-btn nab-link admin-only" id="nabLink" title="Edit Links">🔩</button>
         <button class="nab-btn nab-del admin-only" id="nabDel" title="Delete">🗑️</button>
-      </div>
-      <!-- Selection Bar -->
-      <div class="sel-bar" id="selBar">
-        <span class="sel-bar-count" id="selBarCount">0 selected</span>
-        <div class="sel-bar-actions">
-          <button class="sel-bar-btn" onclick="selectAllOrphans()" title="Select all disconnected nodes">☐ Orphans</button>
-          <button class="sel-bar-btn" onclick="selectByLevel()" title="Select all nodes at a level">☐ Level...</button>
-          <button class="sel-bar-btn" onclick="invertSelection()">⇄ Invert</button>
-          <button class="sel-bar-btn" onclick="selectAll()">☐ All</button>
-          <button class="sel-bar-btn sel-bar-clear" onclick="clearSelection()">✕ Clear</button>
-          <button class="sel-bar-btn sel-bar-delete" onclick="deleteSelected()">🗑 Delete</button>
-        </div>
       </div>
     </div>
     <div class="side-panel" id="sidePanel">
@@ -430,33 +398,10 @@ const DB = {
   },
 
   // Links
-  // Links — with fallback for un-migrated data
   async loadLinks(versionId){
-    // Primary: load by version_id
     const{data,error}=await sb.from('logi_links').select('*').eq('version_id',versionId);
     if(error)throw error;
-    let links=(data||[]).filter(l=>l.deleted!==true);
-    
-    // Fallback: if no links found by version_id, check for un-migrated links (version_id IS NULL)
-    // that belong to the same assembly
-    if(links.length===0){
-      // Get assembly_id from the version
-      const{data:ver}=await sb.from('logi_versions').select('assembly_id').eq('id',versionId).single();
-      if(ver){
-        const{data:fallback}=await sb.from('logi_links').select('*').eq('assembly_id',ver.assembly_id).is('version_id',null);
-        const fbLinks=(fallback||[]).filter(l=>l.deleted!==true);
-        if(fbLinks.length>0){
-          // Auto-repair: assign version_id to these orphaned links
-          console.log('Auto-repairing',fbLinks.length,'links missing version_id');
-          for(const l of fbLinks){
-            await sb.from('logi_links').update({version_id:versionId}).eq('id',l.id);
-            l.version_id=versionId;
-          }
-          links=fbLinks;
-        }
-      }
-    }
-    return links;
+    return(data||[]).filter(l=>l.deleted!==true);
   },
 
   async createLink(link){
@@ -477,20 +422,9 @@ const DB = {
 
   // Clone version (nodes + links)
   async cloneVersion(sourceVersionId, newVersionId, assemblyId){
-    // Load source nodes
+    // Load source data
     const srcNodes = await this.loadNodes(sourceVersionId);
-    
-    // Load source links — try version_id first, fallback to assembly_id
-    let srcLinks = await this.loadLinks(sourceVersionId);
-    
-    // If still no links, try loading ALL non-deleted links for this assembly
-    if(srcLinks.length===0 && srcNodes.length>0){
-      console.warn('No links found for version, trying assembly-wide fallback');
-      const{data:allLinks}=await sb.from('logi_links').select('*').eq('assembly_id',assemblyId);
-      srcLinks=(allLinks||[]).filter(l=>l.deleted!==true);
-    }
-    
-    console.log('Clone: '+srcNodes.length+' nodes, '+srcLinks.length+' links to clone');
+    const srcLinks = await this.loadLinks(sourceVersionId);
     
     // Clone nodes with ID mapping
     const idMap = new Map();
@@ -516,11 +450,10 @@ const DB = {
     }
     
     // Clone links with remapped IDs
-    let linksCloned = 0, linksSkipped = 0;
     for(const l of srcLinks){
       const newParent = idMap.get(l.parent_id);
       const newChild = idMap.get(l.child_id);
-      if(!newParent || !newChild){ linksSkipped++; continue; }
+      if(!newParent || !newChild) continue;
       await this.createLink({
         assembly_id: assemblyId,
         version_id: newVersionId,
@@ -534,12 +467,9 @@ const DB = {
         label_position: l.label_position || null,
         deleted: false
       });
-      linksCloned++;
     }
     
-    if(linksSkipped>0) console.warn('Clone: '+linksSkipped+' links skipped (parent/child not in source nodes)');
-    
-    return { nodesCloned: srcNodes.length, linksCloned };
+    return { nodesCloned: srcNodes.length, linksCloned: srcLinks.length };
   },
 
   // Save node positions
@@ -584,10 +514,6 @@ const S = {
   showParts: true,
   showFast: true,
   showHeaders: true,
-  
-  // Select mode
-  selectMode: false,
-  selectedNodeIds: new Set(),
   
   // Computed
   get isFrozen(){ return this.currentVersion?.status === 'frozen' || this.currentVersion?.status === 'production' }
@@ -986,21 +912,17 @@ async function editVersion(versionId){
     {label:'Cancel',cls:'btn-secondary',action:hideModal},
     {label:'Delete Version',cls:'btn-danger',action:async()=>{
       if(S.versions.length<=1){toast('Cannot delete the only version','err');return}
-      if(!confirm('Delete v'+ver.version+'? All its nodes and links will be permanently removed.'))return;
+      if(!confirm('Delete v'+ver.version+'? All its nodes and links will be lost.'))return;
       try{
-        hideModal();toast('Deleting v'+ver.version+'...');
-        // Hard delete: links first, then nodes, then version record
-        await sb.from('logi_links').delete().eq('version_id',versionId);
-        await sb.from('logi_nodes').delete().eq('version_id',versionId);
+        // Delete all nodes+links for this version
+        const nodes=await DB.loadNodes(versionId);
+        for(const n of nodes)await DB.deleteNode(n.id);
         await sb.from('logi_versions').delete().eq('id',versionId);
-        toast('v'+ver.version+' deleted');
+        hideModal();toast('v'+ver.version+' deleted');
         // Switch to another version
         S.versions=await DB.loadVersions(S.currentAssembly.id);
         S.currentVersion=S.versions[S.versions.length-1];
-        if(S.currentVersion){
-          await DB.setCurrentVersion(S.currentAssembly.id,S.currentVersion.id);
-          S.currentAssembly.current_version_id=S.currentVersion.id;
-        }
+        if(S.currentVersion)await DB.setCurrentVersion(S.currentAssembly.id,S.currentVersion.id);
         renderVersionBar();
         await loadTreeData();
       }catch(e){toast(e.message,'err')}
@@ -1410,27 +1332,12 @@ function renderTree(){
   nodeGs.attr('data-node-id',d=>d.id);
   
   // Click + context
-  nodeGs.style('cursor',d=>S.selectMode?'crosshair':'pointer')
-    .on('click',(e,d)=>{
-      e.stopPropagation();
-      if(S.isDragging)return;
-      if(S.selectMode){
-        // Toggle selection
-        if(S.selectedNodeIds.has(d.id))S.selectedNodeIds.delete(d.id);
-        else S.selectedNodeIds.add(d.id);
-        updateSelectionVisuals();
-        updateSelBar();
-        return;
-      }
-      showNab(d,e);
-    })
+  nodeGs.style('cursor','pointer')
+    .on('click',(e,d)=>{e.stopPropagation();if(S.isDragging)return;showNab(d,e)})
     .on('contextmenu',(e,d)=>{if(!S.isAdmin)return;e.preventDefault();showNodeCtx(e.clientX,e.clientY,d)});
   
   // Click background to deselect
-  svg.on('click',()=>{hideNab();closePanel();if(S.selectMode){S.selectedNodeIds.clear();updateSelectionVisuals();updateSelBar()}});
-  
-  // Apply existing selection visuals after render
-  if(S.selectMode)updateSelectionVisuals();
+  svg.on('click',()=>{hideNab();closePanel()});
   
   // Legend
   const legendEl=document.getElementById('legend');
@@ -1729,11 +1636,8 @@ document.getElementById('treeContainer').addEventListener('contextmenu',e=>{
   if(e.target.tagName==='svg'||e.target.closest('svg')&&!e.target.closest('.node')){
     e.preventDefault();
     const roots=S.nodes.filter(n=>n.goesInto.length===0);
-    const orphans=S.nodes.filter(n=>n.goesInto.length===0&&n.receivesFrom.length===0);
-    const items=[];
-    if(roots.length===0)items.push({label:'➕ Add Root Node (L1)',action:()=>addRootNode()});
-    if(orphans.length>1)items.push({label:'🗑️ Delete '+orphans.length+' Orphan Nodes',danger:true,action:()=>deleteOrphanNodes()});
-    if(items.length)showCtx(e.clientX,e.clientY,items);
+    if(roots.length>0)return; // Only one root
+    showCtx(e.clientX,e.clientY,[{label:'➕ Add Root Node (L1)',action:()=>addRootNode()}]);
   }
 });
 
@@ -1755,166 +1659,10 @@ async function addRootNode(){
   setTimeout(()=>document.getElementById('mRootName')?.focus(),100);
 }
 
-async function deleteOrphanNodes(){
-  const orphans=S.nodes.filter(n=>n.goesInto.length===0&&n.receivesFrom.length===0);
-  if(orphans.length<=1)return; // Keep at least one root if it's the only node
-  
-  // Exclude the actual root node (the one with most descendants or the one at highest level)
-  const root=S.nodes.find(n=>n.goesInto.length===0&&n.receivesFrom.length>0);
-  const toDelete=root?orphans.filter(n=>n.id!==root.id):orphans.slice(1); // Keep first one as root
-  
-  if(!confirm('Delete '+toDelete.length+' orphan nodes? These are nodes with no connections.'))return;
-  
-  try{
-    toast('Deleting '+toDelete.length+' orphans...');
-    // Hard delete - fast bulk
-    const ids=toDelete.map(n=>n.id);
-    // Delete any links referencing these nodes first
-    for(const id of ids){
-      await sb.from('logi_links').delete().or(`parent_id.eq.${id},child_id.eq.${id}`);
-    }
-    // Delete nodes
-    await sb.from('logi_nodes').delete().in('id',ids);
-    toast(toDelete.length+' orphan nodes deleted');
-    await loadTreeData();
-  }catch(e){toast(e.message,'err')}
-}
-
-// ============================================================
-// SELECT MODE — Multi-select nodes for bulk operations
-// ============================================================
-function toggleSelectMode(){
-  S.selectMode=!S.selectMode;
-  const btn=document.getElementById('selectToggle');
-  btn.classList.toggle('active',S.selectMode);
-  btn.textContent=S.selectMode?'☑ Select':'☐ Select';
-  btn.style.background=S.selectMode?'rgba(245,158,11,.15)':'';
-  btn.style.borderColor=S.selectMode?'rgba(245,158,11,.3)':'';
-  btn.style.color=S.selectMode?'#f59e0b':'';
-  document.body.classList.toggle('select-mode',S.selectMode);
-  
-  if(!S.selectMode){
-    S.selectedNodeIds.clear();
-    updateSelectionVisuals();
-  }
-  updateSelBar();
-}
-
-function updateSelBar(){
-  const bar=document.getElementById('selBar');
-  const count=S.selectedNodeIds.size;
-  if(S.selectMode){
-    bar.classList.add('show');
-    document.getElementById('selBarCount').textContent=count+' selected';
-  }else{
-    bar.classList.remove('show');
-  }
-}
-
-function updateSelectionVisuals(){
-  d3.selectAll('.node').each(function(d){
-    const el=d3.select(this);
-    if(S.selectedNodeIds.has(d.id)){
-      el.classed('node-selected',true);
-      // Add selection ring if not present
-      if(!el.select('.sel-ring').node()){
-        const nW=d.treeWidth||d.width||120,nH=d.treeHeight||d.height||36;
-        el.insert('rect',':first-child').attr('class','sel-ring')
-          .attr('x',-nW/2-4).attr('y',-nH/2-4).attr('width',nW+8).attr('height',nH+8)
-          .attr('rx',8).attr('fill','none').attr('stroke','#f59e0b').attr('stroke-width',2.5)
-          .attr('stroke-dasharray','6,3').attr('opacity',.9);
-      }
-    }else{
-      el.classed('node-selected',false);
-      el.select('.sel-ring').remove();
-    }
-  });
-}
-
-function selectAll(){
-  S.nodes.filter(n=>!n.deleted).forEach(n=>S.selectedNodeIds.add(n.id));
-  updateSelectionVisuals();updateSelBar();
-  toast(S.selectedNodeIds.size+' nodes selected','info');
-}
-
-function clearSelection(){
-  S.selectedNodeIds.clear();
-  updateSelectionVisuals();updateSelBar();
-}
-
-function invertSelection(){
-  S.nodes.filter(n=>!n.deleted).forEach(n=>{
-    if(S.selectedNodeIds.has(n.id))S.selectedNodeIds.delete(n.id);
-    else S.selectedNodeIds.add(n.id);
-  });
-  updateSelectionVisuals();updateSelBar();
-  toast(S.selectedNodeIds.size+' nodes selected','info');
-}
-
-function selectAllOrphans(){
-  const orphans=S.nodes.filter(n=>n.goesInto.length===0&&n.receivesFrom.length===0);
-  orphans.forEach(n=>S.selectedNodeIds.add(n.id));
-  updateSelectionVisuals();updateSelBar();
-  toast(orphans.length+' orphans selected','info');
-}
-
-function selectByLevel(){
-  const maxLvl=Math.max(...S.nodes.map(n=>n.level));
-  const levels=[];for(let i=1;i<=maxLvl;i++)levels.push(i);
-  
-  showModal('Select by Level',`
-    <div class="form-group"><label class="form-label">Select all nodes at level:</label>
-      <select class="form-select" id="mSelLevel">
-        ${levels.map(l=>{
-          const cnt=S.nodes.filter(n=>n.level===l).length;
-          return`<option value="${l}">L${l} (${cnt} nodes)</option>`;
-        }).join('')}
-      </select>
-    </div>
-  `,[
-    {label:'Cancel',cls:'btn-secondary',action:hideModal},
-    {label:'Select',action:()=>{
-      const lvl=parseInt(document.getElementById('mSelLevel').value);
-      S.nodes.filter(n=>n.level===lvl).forEach(n=>S.selectedNodeIds.add(n.id));
-      hideModal();updateSelectionVisuals();updateSelBar();
-      toast('L'+lvl+' nodes selected','info');
-    }}
-  ]);
-}
-
-async function deleteSelected(){
-  const count=S.selectedNodeIds.size;
-  if(!count){toast('Nothing selected','err');return}
-  if(!confirm('Delete '+count+' selected nodes and all their links? This cannot be undone.'))return;
-  
-  try{
-    toast('Deleting '+count+' nodes...','info');
-    const ids=[...S.selectedNodeIds];
-    // Bulk delete links referencing these nodes
-    for(const id of ids){
-      await sb.from('logi_links').delete().or(`parent_id.eq.${id},child_id.eq.${id}`);
-    }
-    // Bulk delete nodes
-    await sb.from('logi_nodes').delete().in('id',ids);
-    S.selectedNodeIds.clear();
-    toast(count+' nodes deleted');
-    await loadTreeData();
-  }catch(e){toast(e.message,'err')}
-}
-
 // ============================================================
 // KEYBOARD + GLOBAL EVENTS
 // ============================================================
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    hideCtx();hideNab();hideModal();closePanel();closeBOM();
-    if(S.selectMode){toggleSelectMode();}
-  }
-  // Delete key in select mode
-  if((e.key==='Delete'||e.key==='Backspace')&&S.selectMode&&S.selectedNodeIds.size>0&&!e.target.closest('input,textarea,select')){
-    e.preventDefault();deleteSelected();
-  }
-});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideCtx();hideNab();hideModal();closePanel();closeBOM()}});
 document.addEventListener('click',e=>{if(!e.target.closest('.ctx-menu'))hideCtx();if(!e.target.closest('.nab')&&!e.target.closest('.node'))hideNab()});
 window.addEventListener('resize',()=>{if(S.page==='tree'&&S.nodes.length)renderTree()});
 
