@@ -206,6 +206,7 @@ body.is-admin .admin-only{display:inline-flex}
   <span style="font-size:9px;font-weight:700;color:var(--dim);letter-spacing:1px;margin-right:4px" class="mono">VERSIONS</span>
   <div id="verPills"></div>
   <div class="ver-actions">
+    <button class="hdr-btn admin-only" onclick="editCurrentVersion()" style="font-size:9px" title="Edit current version">✏️ Edit</button>
     <button class="hdr-btn admin-only" onclick="createNewVersion()" style="font-size:9px">+ New Version</button>
     <button class="hdr-btn admin-only" id="freezeBtn" onclick="toggleFreeze()" style="font-size:9px">🔒 Freeze</button>
   </div>
@@ -358,6 +359,11 @@ const DB = {
 
   async updateVersionStatus(versionId, status){
     const{error}=await sb.from('logi_versions').update({status}).eq('id',versionId);
+    if(error)throw error;
+  },
+
+  async updateVersion(versionId, updates){
+    const{error}=await sb.from('logi_versions').update(updates).eq('id',versionId);
     if(error)throw error;
   },
 
@@ -799,7 +805,7 @@ function renderVersionBar(){
     const active=v.id===S.currentVersion?.id;
     const frozen=v.status==='frozen'||v.status==='production';
     const icon=frozen?'🔒':v.status==='production'?'🏭':'✏️';
-    html+=`<button class="ver-pill${active?' active':''}${frozen?' frozen':''}" onclick="switchVersion('${v.id}')" title="${esc(v.notes||'')}">
+    html+=`<button class="ver-pill${active?' active':''}${frozen?' frozen':''}" onclick="switchVersion('${v.id}')" ondblclick="event.stopPropagation();editVersion('${v.id}')" title="${active?'Double-click to edit · ':''}${esc(v.notes||'No notes')}">
       v${esc(v.version)} <span class="st">${icon}</span>
     </button>`;
   });
@@ -883,6 +889,59 @@ async function toggleFreeze(){
     renderVersionBar();
     toast(isFrozen?'Version unfrozen (editable)':'Version frozen (read-only)');
   }catch(e){toast(e.message,'err')}
+}
+
+function editCurrentVersion(){if(S.currentVersion)editVersion(S.currentVersion.id)}
+
+async function editVersion(versionId){
+  if(!S.isAdmin)return;
+  const ver=S.versions.find(v=>v.id===versionId);
+  if(!ver)return;
+  
+  showModal('Edit Version',`
+    <div class="form-group"><label class="form-label">Version Number</label><input class="form-input" id="mEditVerNum" value="${esc(ver.version)}"></div>
+    <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="mEditVerNotes" value="${esc(ver.notes||'')}" placeholder="Version notes..."></div>
+    <div class="form-group"><label class="form-label">Status</label>
+      <select class="form-select" id="mEditVerStatus">
+        <option value="draft"${ver.status==='draft'?' selected':''}>✏️ Draft</option>
+        <option value="frozen"${ver.status==='frozen'?' selected':''}>🔒 Frozen</option>
+        <option value="production"${ver.status==='production'?' selected':''}>🏭 Production</option>
+      </select>
+    </div>
+  `,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Delete Version',cls:'btn-danger',action:async()=>{
+      if(S.versions.length<=1){toast('Cannot delete the only version','err');return}
+      if(!confirm('Delete v'+ver.version+'? All its nodes and links will be lost.'))return;
+      try{
+        // Delete all nodes+links for this version
+        const nodes=await DB.loadNodes(versionId);
+        for(const n of nodes)await DB.deleteNode(n.id);
+        await sb.from('logi_versions').delete().eq('id',versionId);
+        hideModal();toast('v'+ver.version+' deleted');
+        // Switch to another version
+        S.versions=await DB.loadVersions(S.currentAssembly.id);
+        S.currentVersion=S.versions[S.versions.length-1];
+        if(S.currentVersion)await DB.setCurrentVersion(S.currentAssembly.id,S.currentVersion.id);
+        renderVersionBar();
+        await loadTreeData();
+      }catch(e){toast(e.message,'err')}
+    }},
+    {label:'Save',action:async()=>{
+      const newNum=document.getElementById('mEditVerNum').value.trim();
+      const newNotes=document.getElementById('mEditVerNotes').value.trim();
+      const newStatus=document.getElementById('mEditVerStatus').value;
+      if(!newNum){toast('Version number required','err');return}
+      // Check for duplicate version number (excluding this one)
+      if(newNum!==ver.version&&S.versions.some(v=>v.version===newNum)){toast('Version number already exists','err');return}
+      try{
+        await DB.updateVersion(versionId,{version:newNum,notes:newNotes||null,status:newStatus});
+        ver.version=newNum;ver.notes=newNotes||null;ver.status=newStatus;
+        hideModal();renderVersionBar();toast('Version updated');
+      }catch(e){toast(e.message,'err')}
+    }}
+  ]);
+  setTimeout(()=>document.getElementById('mEditVerNum')?.focus(),100);
 }
 
 function suggestNextVersion(current){
