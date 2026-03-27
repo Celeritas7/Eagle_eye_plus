@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EagleEye+</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0d12;--card:#13141b;--card2:#181920;--hover:#1e2030;
+  --border:#222438;--border2:#2a2d42;
+  --text:#cdd0e0;--muted:#6b7094;--dim:#3d4060;
+  --accent:#f59e0b;--accent2:#fbbf24;
+  --purple:#8b5cf6;--green:#10b981;--red:#ef4444;--blue:#3b82f6;
+  --orange:#f97316;--pink:#ec4899;--cyan:#06b6d4;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;overflow:hidden}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+select option{background:var(--card);color:var(--text)}
+.mono{font-family:var(--mono)}
+
+/* ═══ HEADER ═══ */
+.header{height:44px;background:#0a0b10;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;z-index:50;position:relative}
+.header h1{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--accent);letter-spacing:-0.5px}
+.hdr-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.hdr-btn{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;border:1px solid var(--border);cursor:pointer;font-family:var(--mono);background:transparent;color:var(--muted);transition:all .15s}
+.hdr-btn:hover{background:var(--hover);color:var(--text)}
+.hdr-btn.active{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.3);color:#a78bfa}
+.hdr-back{display:none}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.db-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.db-dot.ok{background:var(--green)}
+.db-dot.err{background:var(--red)}
+.user-badge{display:none;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);font-size:10px;font-weight:600;color:var(--accent);font-family:var(--mono)}
+.login-btn{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:transparent;color:var(--muted);display:flex;align-items:center;gap:5px}
+.login-btn img{width:12px;height:12px}
+
+/* ═══ VERSION BAR ═══ */
+.ver-bar{display:none;height:34px;background:#0e0f15;border-bottom:1px solid var(--border);padding:0 14px;align-items:center;gap:6px;overflow-x:auto}
+.ver-bar.show{display:flex}
+.ver-pill{padding:3px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--mono);border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s;white-space:nowrap}
+.ver-pill:hover{border-color:var(--muted)}
+.ver-pill.active{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.35);color:#a78bfa}
+.ver-pill.frozen{opacity:.7}
+.ver-pill .st{font-size:7px;margin-left:3px;vertical-align:middle}
+.ver-actions{margin-left:auto;display:flex;gap:5px;flex-shrink:0}
+
+/* ═══ PAGES ═══ */
+.page{display:none;min-height:calc(100vh - 44px);overflow-y:auto}
+.page.show{display:flex;flex-direction:column;align-items:center}
+
+/* Home */
+.home-hero{text-align:center;padding-top:60px;margin-bottom:32px}
+.home-logo{font-size:44px;font-weight:900;color:var(--accent);font-family:var(--mono);letter-spacing:-2px}
+.home-sub{font-size:13px;color:var(--muted);margin-top:6px}
+.section-lbl{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;max-width:800px;width:100%;padding:0 20px 40px}
+.proj-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.proj-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.proj-card-bar{position:absolute;top:0;left:0;right:0;height:3px}
+.proj-card h3{font-size:15px;font-weight:700;margin-bottom:4px}
+.proj-card p{font-size:11px;color:var(--muted);line-height:1.4}
+.proj-card .cnt{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:8px}
+.add-card{border:2px dashed var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px}
+.add-card:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Assemblies */
+.asm-header{padding:24px 20px 16px;max-width:800px;width:100%;display:flex;align-items:center;gap:12px}
+.asm-header-icon{font-size:36px}
+.asm-header h2{font-size:20px;font-weight:800}
+.asm-header p{font-size:11px;color:var(--muted)}
+.asm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;max-width:800px;width:100%;padding:0 20px 40px}
+.asm-card{background:var(--card);border:2px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s;text-align:center}
+.asm-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.asm-card h4{font-size:14px;font-weight:700;margin-bottom:4px}
+.asm-card .cnt{font-size:10px;color:var(--muted);font-family:var(--mono)}
+
+/* ═══ TREE PAGE ═══ */
+.tree-page{display:none;height:calc(100vh - 44px);overflow:hidden}
+.tree-page.show{display:flex;flex-direction:column}
+.tree-page.has-verbar{height:calc(100vh - 78px)}
+.tree-wrap{flex:1;display:flex;overflow:hidden}
+.tree-container{flex:1;position:relative;overflow:hidden;background:#fafafa}
+.tree-container svg{width:100%;height:100%}
+
+/* Side Panel */
+.side-panel{width:0;overflow:hidden;border-left:1px solid var(--border);background:var(--card);transition:width .2s;display:flex;flex-direction:column}
+.side-panel.open{width:320px}
+.sp-hdr{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sp-hdr span{font-size:13px;font-weight:700}
+.sp-close{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer}
+.sp-body{flex:1;overflow-y:auto;padding:12px 14px}
+.sp-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:6px;justify-content:flex-end}
+.sp-btn{padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--mono);border:none}
+.sp-btn-primary{background:var(--accent);color:#000}
+.sp-btn-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.sp-btn-secondary{background:var(--hover);color:var(--muted);border:1px solid var(--border)}
+
+/* Tree Toolbar */
+.tree-toolbar{height:36px;background:#0e0f15;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:4px}
+.tb-btn{padding:3px 8px;border-radius:5px;font-size:9px;font-weight:700;border:1px solid var(--border);cursor:pointer;font-family:var(--mono);background:transparent;color:var(--muted)}
+.tb-btn:hover{background:var(--hover)}
+.tb-btn.active{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.25);color:#60a5fa}
+.tb-sep{width:1px;height:18px;background:var(--border);margin:0 2px}
+
+/* Legend */
+.legend{display:none;position:absolute;bottom:8px;left:8px;padding:4px 10px;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:6px;font-size:8px;color:#666;font-family:var(--mono);display:flex;gap:6px;flex-wrap:wrap;z-index:5}
+.legend-item{display:flex;align-items:center;gap:3px}
+.legend-swatch{width:8px;height:8px;border-radius:2px}
+
+/* Zoom Controls */
+.zoom-ctrl{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:5}
+.zoom-btn{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.92);border:1px solid #ddd;cursor:pointer;font-size:14px;font-family:var(--mono);display:flex;align-items:center;justify-content:center;color:#555}
+.zoom-btn:hover{background:#fff;border-color:#aaa}
+
+/* ═══ BOM OVERLAY ═══ */
+.bom-overlay{display:none;position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);backdrop-filter:blur(3px)}
+.bom-overlay.show{display:flex;align-items:center;justify-content:center}
+.bom-panel{width:min(900px,94vw);max-height:88vh;background:var(--card);border-radius:14px;border:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.bom-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.bom-hdr h3{font-size:15px;font-weight:800;flex:1}
+.bom-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+.bom-body{flex:1;overflow-y:auto;padding:0}
+.bom-table{width:100%;border-collapse:collapse;font-size:11px}
+.bom-table th{background:var(--card2);padding:6px 10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;position:sticky;top:0}
+.bom-table td{padding:5px 10px;border-top:1px solid var(--border)}
+.bom-grp-row{background:var(--card2);font-weight:700}
+
+/* ═══ MODAL ═══ */
+.modal-overlay{display:none;position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:14px;width:min(440px,92vw);border:1px solid var(--border);overflow:hidden}
+.modal-hdr{padding:14px 18px;border-bottom:1px solid var(--border);font-size:15px;font-weight:700}
+.modal-body{padding:16px 18px}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.form-group{margin-bottom:12px}
+.form-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block}
+.form-input,.form-select,.form-textarea{width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--mono);outline:none}
+.form-input:focus,.form-select:focus{border-color:var(--accent)}
+.form-textarea{min-height:60px;resize:vertical;font-family:var(--sans)}
+.btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:var(--mono)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-secondary{background:var(--hover);color:var(--muted);border:1px solid var(--border)}
+.btn-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+
+/* ═══ CONTEXT MENU ═══ */
+.ctx-menu{position:fixed;z-index:100;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 0;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.ctx-item{padding:6px 14px;font-size:11px;cursor:pointer;color:var(--text)}
+.ctx-item:hover{background:var(--hover)}
+.ctx-item.danger{color:var(--red)}
+.ctx-sep{height:1px;background:var(--border);margin:3px 0}
+
+/* Node Action Bar */
+.nab{display:none;position:absolute;z-index:30;background:rgba(255,255,255,.96);border:1px solid #ddd;border-radius:8px;padding:4px;gap:2px;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.nab.show{display:flex}
+.nab-btn{width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;background:transparent}
+.nab-btn:hover{background:#f0f0f0}
+.nab-add{color:#10b981}.nab-edit{color:#3b82f6}.nab-link{color:#f59e0b}.nab-del{color:#ef4444}
+
+/* ═══ TOAST ═══ */
+.toast-wrap{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:4px;align-items:center}
+.toast{padding:6px 16px;border-radius:6px;font-weight:700;font-size:10px;font-family:var(--mono);max-width:360px;text-align:center;animation:toastIn .2s}
+.toast-ok{background:var(--green);color:#fff}
+.toast-err{background:var(--red);color:#fff}
+.toast-info{background:var(--blue);color:#fff}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ ADMIN-ONLY ═══ */
+.admin-only{display:none}
+body.is-admin .admin-only{display:inline-flex}
+
+/* Loading */
+.spinner{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);padding:40px}
+
+/* Breadcrumb */
+.breadcrumb{font-size:11px;color:var(--muted);font-family:var(--mono)}
+</style>
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<div class="header">
+  <h1>◈ EagleEye+</h1>
+  <button class="hdr-btn hdr-back" id="backBtn" onclick="goBack()">← Back</button>
+  <span class="breadcrumb" id="breadcrumb"></span>
+  <div class="hdr-right">
+    <div class="db-dot" id="dbDot"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"> Sign In
+    </button>
+    <div class="user-badge" id="userBadge"><span id="userName"></span>
+      <button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;padding:2px" onclick="doLogout()">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ VERSION BAR ═══════ -->
+<div class="ver-bar" id="verBar">
+  <span style="font-size:9px;font-weight:700;color:var(--dim);letter-spacing:1px;margin-right:4px" class="mono">VERSIONS</span>
+  <div id="verPills"></div>
+  <div class="ver-actions">
+    <button class="hdr-btn admin-only" onclick="createNewVersion()" style="font-size:9px">+ New Version</button>
+    <button class="hdr-btn admin-only" id="freezeBtn" onclick="toggleFreeze()" style="font-size:9px">🔒 Freeze</button>
+  </div>
+</div>
+
+<!-- ═══════ HOME PAGE ═══════ -->
+<div class="page show" id="homePage">
+  <div class="home-hero">
+    <div class="home-logo">◈ EagleEye+</div>
+    <div class="home-sub">Assembly Tree Builder · Version Control · ECN Tracking</div>
+  </div>
+  <div style="max-width:800px;width:100%;padding:0 20px"><div class="section-lbl">PROJECTS</div></div>
+  <div class="proj-grid" id="projGrid"></div>
+</div>
+
+<!-- ═══════ ASSEMBLIES PAGE ═══════ -->
+<div class="page" id="asmPage">
+  <div class="asm-header" id="asmHeader">
+    <span class="asm-header-icon" id="asmIcon">📁</span>
+    <div><h2 id="asmTitle">Project</h2><p id="asmDesc">Description</p></div>
+  </div>
+  <div class="asm-grid" id="asmGrid"></div>
+</div>
+
+<!-- ═══════ TREE PAGE ═══════ -->
+<div class="tree-page" id="treePage">
+  <div class="tree-toolbar" id="treeToolbar">
+    <span class="mono" style="font-size:10px;font-weight:700;color:var(--muted)" id="treeTitle">Assembly</span>
+    <div class="tb-sep"></div>
+    <button class="tb-btn active" id="seqToggle" onclick="toggleSeq()">🔢 Seq</button>
+    <button class="tb-btn active" id="partsToggle" onclick="toggleParts()">📦 Parts</button>
+    <button class="tb-btn active" id="fastToggle" onclick="toggleFast()">🔩 Fast</button>
+    <button class="tb-btn active" id="headersToggle" onclick="toggleHeaders()">📊 Levels</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="openBOM()" style="background:rgba(22,160,133,.08);border-color:rgba(22,160,133,.2);color:#1abc9c">📋 BOM</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn admin-only" id="saveBtn" onclick="savePositions()">💾 Save</button>
+  </div>
+  <div class="tree-wrap">
+    <div class="tree-container" id="treeContainer">
+      <svg id="treeSvg"></svg>
+      <div class="zoom-ctrl">
+        <button class="zoom-btn" onclick="doZoomIn()">+</button>
+        <button class="zoom-btn" onclick="doZoomOut()">−</button>
+        <button class="zoom-btn" onclick="doFit()">⊡</button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <!-- Node Action Bar -->
+      <div class="nab" id="nodeActionBar">
+        <button class="nab-btn nab-add admin-only" id="nabAdd" title="Add Child">➕</button>
+        <button class="nab-btn nab-edit" id="nabEdit" title="Edit">✏️</button>
+        <button class="nab-btn nab-link admin-only" id="nabLink" title="Edit Links">🔩</button>
+        <button class="nab-btn nab-del admin-only" id="nabDel" title="Delete">🗑️</button>
+      </div>
+    </div>
+    <div class="side-panel" id="sidePanel">
+      <div class="sp-hdr"><span id="spTitle">Edit Node</span><button class="sp-close" onclick="closePanel()">×</button></div>
+      <div class="sp-body" id="spBody"></div>
+      <div class="sp-footer" id="spFooter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ BOM OVERLAY ═══════ -->
+<div class="bom-overlay" id="bomOverlay">
+  <div class="bom-panel">
+    <div class="bom-hdr">
+      <h3>📋 BOM — <span id="bomTitle"></span></h3>
+      <button class="bom-close" onclick="closeBOM()">✕</button>
+    </div>
+    <div class="bom-body" id="bomBody"></div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL ═══════ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-hdr" id="modalTitle">Confirm</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- ═══════ CONTEXT MENU ═══════ -->
+<div id="ctxMenu" class="ctx-menu" style="display:none"></div>
+
+<!-- ═══════ TOAST ═══════ -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SB_URL = 'https://wylxvmkcrexwfpjpbhyy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bHh2bWtjcmV4d2ZwanBiaHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2MzkxMDYsImV4cCI6MjA4NDIxNTEwNn0.6Bxo42hx4jwlJGWnfjiTpiDUsYfc1QLTN3YtrU1efak';
+const ADMIN_EMAIL = 'mangaonkaraniket@gmail.com';
+
+const LEVEL_COLORS = ["#a5d6a7","#e1bee7","#b3e5fc","#c8e6c9","#fff9c4","#ffe0b2","#ffcdd2","#e8e8e8"];
+const LEVEL_SHAPES = ["stadium","octagon","hexagon","pentagon","diamond","rounded_rectangle","rectangle","parallelogram"];
+const LEVEL_FONT_SIZES = [14,13,12,12,11,11,10,10];
+const LEVEL_FONT_WEIGHTS = [700,600,600,500,500,400,400,400];
+const LEVEL_GAPS = [300,250,220,200,180,160,150];
+const GROUP_COLORS = ["#78909c","#42a5f5","#ff7043","#ec407a","#ab47bc","#26a69a","#d4e157","#ffa726"];
+const FASTENER_COLORS = {CBE:"#3498db",CBST:"#9b59b6",M:"#27ae60",MS:"#e67e22",PRESS:"#e74c3c",OTHER:"#7f8c8d"};
+const NODE_W_BASE = 120, NODE_W_MAX = 160;
+
+function getLvlColor(l){return LEVEL_COLORS[Math.min(l-1,7)]}
+function getLvlShape(l){return LEVEL_SHAPES[Math.min(l-1,7)]}
+function getLvlFS(l){return LEVEL_FONT_SIZES[Math.min(l-1,7)]}
+function getLvlFW(l){return LEVEL_FONT_WEIGHTS[Math.min(l-1,7)]}
+function getGrpColor(g){return GROUP_COLORS[(g||0)%GROUP_COLORS.length]}
+function getFastColor(t){if(!t)return FASTENER_COLORS.OTHER;const p=t.toUpperCase().split(/[^A-Z]/)[0];return FASTENER_COLORS[p]||FASTENER_COLORS.OTHER}
+function darken(hex,pct=30){let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);r=Math.max(0,Math.floor(r*(100-pct)/100));g=Math.max(0,Math.floor(g*(100-pct)/100));b=Math.max(0,Math.floor(b*(100-pct)/100));return'#'+[r,g,b].map(c=>c.toString(16).padStart(2,'0')).join('')}
+
+// ============================================================
+// DATABASE
+// ============================================================
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+const DB = {
+  // Projects
+  async loadProjects(){
+    const{data,error}=await sb.from('logi_projects').select('*').order('name');
+    if(error)throw error;
+    return data||[];
+  },
+
+  // Assemblies
+  async loadAssemblies(projectId){
+    const{data,error}=await sb.from('logi_assemblies').select('*').eq('project_id',projectId).order('name');
+    if(error)throw error;
+    return data||[];
+  },
+
+  // Versions
+  async loadVersions(assemblyId){
+    const{data,error}=await sb.from('logi_versions').select('*').eq('assembly_id',assemblyId).order('created_at');
+    if(error)throw error;
+    return data||[];
+  },
+
+  async createVersion(assemblyId, version, notes){
+    const{data,error}=await sb.from('logi_versions').insert({assembly_id:assemblyId,version,notes:notes||null,created_by:S.userName||'admin',status:'draft'}).select().single();
+    if(error)throw error;
+    return data;
+  },
+
+  async updateVersionStatus(versionId, status){
+    const{error}=await sb.from('logi_versions').update({status}).eq('id',versionId);
+    if(error)throw error;
+  },
+
+  async setCurrentVersion(assemblyId, versionId){
+    const{error}=await sb.from('logi_assemblies').update({current_version_id:versionId}).eq('id',assemblyId);
+    if(error)throw error;
+  },
+
+  // Nodes
+  async loadNodes(versionId){
+    const{data,error}=await sb.from('logi_nodes').select('*').eq('version_id',versionId).eq('deleted',false);
+    if(error)throw error;
+    return data||[];
+  },
+
+  async createNode(node){
+    const{data,error}=await sb.from('logi_nodes').insert(node).select().single();
+    if(error)throw error;
+    return data;
+  },
+
+  async updateNode(nodeId, updates){
+    const{error}=await sb.from('logi_nodes').update(updates).eq('id',nodeId);
+    return!error;
+  },
+
+  async deleteNode(nodeId){
+    // Soft delete + remove links
+    await sb.from('logi_links').update({deleted:true}).or(`parent_id.eq.${nodeId},child_id.eq.${nodeId}`);
+    const{error}=await sb.from('logi_nodes').update({deleted:true}).eq('id',nodeId);
+    return!error;
+  },
+
+  // Links
+  async loadLinks(versionId){
+    const{data,error}=await sb.from('logi_links').select('*').eq('version_id',versionId);
+    if(error)throw error;
+    return(data||[]).filter(l=>l.deleted!==true);
+  },
+
+  async createLink(link){
+    const{data,error}=await sb.from('logi_links').insert(link).select().single();
+    if(error)throw error;
+    return data;
+  },
+
+  async updateLink(linkId, updates){
+    const{error}=await sb.from('logi_links').update(updates).eq('id',linkId);
+    return!error;
+  },
+
+  async deleteLink(linkId){
+    const{error}=await sb.from('logi_links').update({deleted:true}).eq('id',linkId);
+    return!error;
+  },
+
+  // Clone version (nodes + links)
+  async cloneVersion(sourceVersionId, newVersionId, assemblyId){
+    // Load source data
+    const srcNodes = await this.loadNodes(sourceVersionId);
+    const srcLinks = await this.loadLinks(sourceVersionId);
+    
+    // Clone nodes with ID mapping
+    const idMap = new Map();
+    for(const n of srcNodes){
+      const clone = {
+        assembly_id: assemblyId,
+        version_id: newVersionId,
+        name: n.name,
+        part_number: n.part_number,
+        status: n.status || 'NOT_STARTED',
+        qty: n.qty || 1,
+        group_num: n.group_num || 0,
+        sequence_num: n.sequence_num || 0,
+        sequence_tag: n.sequence_tag || null,
+        notes: n.notes || null,
+        x: n.x, y: n.y,
+        tree_y: n.tree_y || null,
+        is_locked: n.is_locked || false,
+        deleted: false
+      };
+      const created = await this.createNode(clone);
+      idMap.set(n.id, created.id);
+    }
+    
+    // Clone links with remapped IDs
+    for(const l of srcLinks){
+      const newParent = idMap.get(l.parent_id);
+      const newChild = idMap.get(l.child_id);
+      if(!newParent || !newChild) continue;
+      await this.createLink({
+        assembly_id: assemblyId,
+        version_id: newVersionId,
+        parent_id: newParent,
+        child_id: newChild,
+        fastener: l.fastener || null,
+        qty: l.qty || 1,
+        loctite: l.loctite || null,
+        torque_value: l.torque_value || null,
+        torque_unit: l.torque_unit || null,
+        label_position: l.label_position || null,
+        deleted: false
+      });
+    }
+    
+    return { nodesCloned: srcNodes.length, linksCloned: srcLinks.length };
+  },
+
+  // Save node positions
+  async savePositions(updates){
+    let count=0;
+    for(const[id,pos]of Object.entries(updates)){
+      const ok = await this.updateNode(id, {x:pos.x, y:pos.y, tree_y:pos.treeY||pos.y});
+      if(ok)count++;
+    }
+    return count;
+  }
+};
+
+// ============================================================
+// STATE
+// ============================================================
+const S = {
+  page: 'home',
+  isAdmin: false,
+  userName: '',
+  userEmail: '',
+  
+  // Data
+  projects: [],
+  assemblies: [],
+  versions: [],
+  nodes: [],
+  links: [],
+  
+  // Current selection
+  currentProject: null,
+  currentAssembly: null,
+  currentVersion: null,
+  
+  // Tree
+  collapsedNodes: new Set(),
+  lockedNodes: new Set(),
+  isDragging: false,
+  
+  // View toggles
+  showSeq: true,
+  showParts: true,
+  showFast: true,
+  showHeaders: true,
+  
+  // Computed
+  get isFrozen(){ return this.currentVersion?.status === 'frozen' || this.currentVersion?.status === 'production' }
+};
+
+// ============================================================
+// UI UTILITIES
+// ============================================================
+function toast(msg, type='ok'){
+  const el=document.createElement('div');
+  el.className='toast toast-'+type;
+  el.textContent=msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300)},2500);
+}
+
+function showModal(title, body, buttons){
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').innerHTML=body;
+  const footer=document.getElementById('modalFooter');
+  footer.innerHTML='';
+  buttons.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+(b.cls||'btn-primary');
+    btn.textContent=b.label;
+    btn.onclick=()=>{b.action();};
+    footer.appendChild(btn);
+  });
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function hideModal(){document.getElementById('modalOverlay').classList.remove('show')}
+
+function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+
+let _ctxEl=null;
+function showCtx(x,y,items){
+  hideCtx();
+  const menu=document.getElementById('ctxMenu');
+  menu.innerHTML='';menu.style.display='block';menu.style.left=x+'px';menu.style.top=y+'px';
+  items.forEach(item=>{
+    if(item.sep){const s=document.createElement('div');s.className='ctx-sep';menu.appendChild(s);return}
+    const el=document.createElement('div');
+    el.className='ctx-item'+(item.danger?' danger':'');
+    el.textContent=item.label;
+    el.onclick=()=>{item.action();hideCtx()};
+    menu.appendChild(el);
+  });
+  setTimeout(()=>document.addEventListener('click',hideCtx,{once:true}),10);
+}
+function hideCtx(){const m=document.getElementById('ctxMenu');if(m)m.style.display='none'}
+
+function openPanel(title,bodyHtml,footerButtons){
+  document.getElementById('spTitle').textContent=title;
+  document.getElementById('spBody').innerHTML=bodyHtml;
+  const footer=document.getElementById('spFooter');
+  footer.innerHTML='';
+  (footerButtons||[]).forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='sp-btn '+(b.cls||'sp-btn-primary');
+    btn.textContent=b.label;
+    btn.onclick=b.action;
+    footer.appendChild(btn);
+  });
+  document.getElementById('sidePanel').classList.add('open');
+}
+function closePanel(){document.getElementById('sidePanel').classList.remove('open')}
+
+function hideNab(){document.getElementById('nodeActionBar').classList.remove('show');_nabNodeId=null}
+let _nabNodeId=null;
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigateTo(page){
+  S.page=page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+  document.getElementById('treePage').classList.remove('show');
+  
+  const back=document.getElementById('backBtn');
+  const bc=document.getElementById('breadcrumb');
+  const vb=document.getElementById('verBar');
+  
+  if(page==='home'){
+    document.getElementById('homePage').classList.add('show');
+    back.style.display='none';bc.textContent='';vb.classList.remove('show');
+  }else if(page==='assemblies'){
+    document.getElementById('asmPage').classList.add('show');
+    back.style.display='';back.classList.add('hdr-back');back.style.display='inline-flex';
+    bc.textContent=S.currentProject?.name||'';vb.classList.remove('show');
+  }else if(page==='tree'){
+    document.getElementById('treePage').classList.add('show');
+    back.style.display='inline-flex';
+    bc.textContent=(S.currentProject?.name||'')+' / '+(S.currentAssembly?.name||'');
+    vb.classList.add('show');
+    document.getElementById('treePage').classList.toggle('has-verbar',true);
+  }
+}
+
+function goBack(){
+  if(S.page==='tree')navigateTo('assemblies');
+  else if(S.page==='assemblies')navigateTo('home');
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+async function checkAuth(){
+  try{
+    const{data:{session}}=await sb.auth.getSession();
+    if(session?.user)handleUser(session.user);
+    sb.auth.onAuthStateChange((ev,sess)=>{
+      if(ev==='SIGNED_IN'&&sess?.user)handleUser(sess.user);
+      else if(ev==='SIGNED_OUT'){S.isAdmin=false;S.userName='';S.userEmail='';document.body.classList.remove('is-admin');document.getElementById('loginBtn').style.display='';document.getElementById('userBadge').style.display='none'}
+    });
+  }catch(e){console.error('Auth:',e)}
+}
+
+function handleUser(user){
+  S.userEmail=user.email||'';
+  S.userName=user.user_metadata?.full_name||user.user_metadata?.name||S.userEmail.split('@')[0];
+  S.isAdmin=S.userEmail.toLowerCase()===ADMIN_EMAIL.toLowerCase();
+  document.body.classList.toggle('is-admin',S.isAdmin);
+  document.getElementById('loginBtn').style.display='none';
+  document.getElementById('userBadge').style.display='flex';
+  document.getElementById('userName').textContent=(S.isAdmin?'🔧 ':'👁 ')+S.userName;
+  toast('Welcome, '+S.userName,S.isAdmin?'ok':'info');
+}
+
+async function doLogin(){
+  await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
+}
+async function doLogout(){
+  await sb.auth.signOut();
+  toast('Logged out','info');
+}
+
+// ============================================================
+// PROJECTS PAGE
+// ============================================================
+async function loadProjects(){
+  try{
+    S.projects=await DB.loadProjects();
+    renderProjects();
+  }catch(e){console.error('Projects:',e);toast(e.message,'err')}
+}
+
+function renderProjects(){
+  const grid=document.getElementById('projGrid');
+  let html='';
+  S.projects.forEach(p=>{
+    html+=`<div class="proj-card" onclick="openProject('${p.id}')">
+      <div class="proj-card-bar" style="background:${p.color||'#3498db'}"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:24px">${p.icon||'📁'}</span>
+        <h3>${esc(p.name)}</h3>
+      </div>
+      <p>${esc(p.description||'No description')}</p>
+      <div class="cnt">Loading...</div>
+    </div>`;
+  });
+  if(S.isAdmin){
+    html+=`<div class="proj-card add-card" onclick="createProject()"><span style="font-size:28px">➕</span><span>New Project</span></div>`;
+  }
+  grid.innerHTML=html;
+  // Load counts async
+  S.projects.forEach(async(p,i)=>{
+    try{
+      const{count}=await sb.from('logi_assemblies').select('count',{count:'exact',head:true}).eq('project_id',p.id);
+      const cards=grid.querySelectorAll('.proj-card');
+      const cntEl=cards[i]?.querySelector('.cnt');
+      if(cntEl)cntEl.textContent=(count||0)+' assemblies';
+    }catch(e){}
+  });
+}
+
+async function openProject(id){
+  S.currentProject=S.projects.find(p=>p.id===id);
+  if(!S.currentProject)return;
+  document.getElementById('asmIcon').textContent=S.currentProject.icon||'📁';
+  document.getElementById('asmTitle').textContent=S.currentProject.name;
+  document.getElementById('asmDesc').textContent=S.currentProject.description||'';
+  try{
+    S.assemblies=await DB.loadAssemblies(id);
+    renderAssemblies();
+    navigateTo('assemblies');
+  }catch(e){toast(e.message,'err')}
+}
+
+function createProject(){
+  showModal('New Project',`
+    <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="mProjName" placeholder="Project name"></div>
+    <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="mProjDesc" placeholder="Description"></textarea></div>
+  `,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Create',action:async()=>{
+      const name=document.getElementById('mProjName').value.trim();
+      if(!name){toast('Name required','err');return}
+      try{
+        await sb.from('logi_projects').insert({name,description:document.getElementById('mProjDesc').value.trim(),icon:'📁',color:'#3498db',is_visible:true});
+        hideModal();toast('Project created');await loadProjects();
+      }catch(e){toast(e.message,'err')}
+    }}
+  ]);
+  setTimeout(()=>document.getElementById('mProjName')?.focus(),100);
+}
+
+// ============================================================
+// ASSEMBLIES PAGE
+// ============================================================
+function renderAssemblies(){
+  const grid=document.getElementById('asmGrid');
+  let html='';
+  S.assemblies.forEach(a=>{
+    html+=`<div class="asm-card" onclick="openAssembly('${a.id}','${esc(a.name)}')">
+      <h4>${esc(a.name)}</h4>
+      <div class="cnt" id="asmCnt_${a.id}">Loading...</div>
+    </div>`;
+  });
+  if(S.isAdmin){
+    html+=`<div class="asm-card add-card" onclick="createAssembly()"><span style="font-size:28px">➕</span><span>New Assembly</span></div>`;
+  }
+  grid.innerHTML=html;
+  S.assemblies.forEach(async a=>{
+    try{
+      const{count}=await sb.from('logi_nodes').select('count',{count:'exact',head:true}).eq('assembly_id',a.id).eq('deleted',false);
+      const el=document.getElementById('asmCnt_'+a.id);
+      if(el)el.textContent=(count||0)+' nodes';
+    }catch(e){}
+  });
+}
+
+async function openAssembly(id, name){
+  S.currentAssembly=S.assemblies.find(a=>a.id===id)||{id,name};
+  document.getElementById('treeTitle').textContent=name||id;
+  
+  try{
+    // Load versions
+    S.versions=await DB.loadVersions(id);
+    
+    // If no versions exist, auto-create v1.0
+    if(S.versions.length===0){
+      const v=await DB.createVersion(id,'1.0','Initial version');
+      await DB.setCurrentVersion(id,v.id);
+      S.versions=[v];
+      S.currentAssembly.current_version_id=v.id;
+    }
+    
+    // Select current version
+    const curVid=S.currentAssembly.current_version_id;
+    S.currentVersion=S.versions.find(v=>v.id===curVid)||S.versions[S.versions.length-1];
+    
+    renderVersionBar();
+    await loadTreeData();
+    navigateTo('tree');
+  }catch(e){console.error(e);toast(e.message,'err')}
+}
+
+function createAssembly(){
+  showModal('New Assembly',`
+    <div class="form-group"><label class="form-label">Assembly Name</label><input class="form-input" id="mAsmName" placeholder="e.g. Head & Body"></div>
+  `,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Create',action:async()=>{
+      const name=document.getElementById('mAsmName').value.trim();
+      if(!name){toast('Name required','err');return}
+      try{
+        const{data:newAsm}=await sb.from('logi_assemblies').insert({name,project_id:S.currentProject.id,is_visible:true}).select().single();
+        // Create default version
+        const v=await DB.createVersion(newAsm.id,'1.0','Initial');
+        await DB.setCurrentVersion(newAsm.id,v.id);
+        // Create root node
+        await DB.createNode({assembly_id:newAsm.id,version_id:v.id,name,status:'NOT_STARTED',x:800,y:400,deleted:false});
+        hideModal();toast('Assembly created');
+        S.assemblies=await DB.loadAssemblies(S.currentProject.id);
+        renderAssemblies();
+      }catch(e){toast(e.message,'err')}
+    }}
+  ]);
+  setTimeout(()=>document.getElementById('mAsmName')?.focus(),100);
+}
+
+// ============================================================
+// VERSION MANAGEMENT
+// ============================================================
+function renderVersionBar(){
+  const pills=document.getElementById('verPills');
+  let html='';
+  S.versions.forEach(v=>{
+    const active=v.id===S.currentVersion?.id;
+    const frozen=v.status==='frozen'||v.status==='production';
+    const icon=frozen?'🔒':v.status==='production'?'🏭':'✏️';
+    html+=`<button class="ver-pill${active?' active':''}${frozen?' frozen':''}" onclick="switchVersion('${v.id}')" title="${esc(v.notes||'')}">
+      v${esc(v.version)} <span class="st">${icon}</span>
+    </button>`;
+  });
+  pills.innerHTML=html;
+  
+  // Update freeze button
+  const fb=document.getElementById('freezeBtn');
+  if(S.currentVersion){
+    const frozen=S.currentVersion.status==='frozen'||S.currentVersion.status==='production';
+    fb.textContent=frozen?'🔓 Unfreeze':'🔒 Freeze';
+    fb.style.background=frozen?'rgba(245,158,11,.1)':'';
+    fb.style.borderColor=frozen?'rgba(245,158,11,.2)':'';
+    fb.style.color=frozen?'#f59e0b':'';
+  }
+}
+
+async function switchVersion(versionId){
+  S.currentVersion=S.versions.find(v=>v.id===versionId);
+  if(!S.currentVersion)return;
+  await DB.setCurrentVersion(S.currentAssembly.id,versionId);
+  renderVersionBar();
+  await loadTreeData();
+}
+
+async function createNewVersion(){
+  const last=S.versions[S.versions.length-1];
+  const nextVer=suggestNextVersion(last?.version||'1.0');
+  
+  showModal('New Version',`
+    <div class="form-group"><label class="form-label">Version Number</label><input class="form-input" id="mVerNum" value="${nextVer}" placeholder="e.g. 2.0"></div>
+    <div class="form-group"><label class="form-label">Notes (optional)</label><input class="form-input" id="mVerNotes" placeholder="What changed..."></div>
+    <div class="form-group"><label class="form-label">Clone from</label>
+      <select class="form-select" id="mVerSource">
+        ${S.versions.map(v=>`<option value="${v.id}"${v.id===S.currentVersion?.id?' selected':''}>v${esc(v.version)} (${v.status})</option>`).join('')}
+        <option value="">Empty (no nodes)</option>
+      </select>
+    </div>
+  `,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Create',action:async()=>{
+      const ver=document.getElementById('mVerNum').value.trim();
+      const notes=document.getElementById('mVerNotes').value.trim();
+      const sourceId=document.getElementById('mVerSource').value;
+      if(!ver){toast('Version number required','err');return}
+      if(S.versions.some(v=>v.version===ver)){toast('Version already exists','err');return}
+      
+      try{
+        hideModal();toast('Creating v'+ver+'...');
+        const newVer=await DB.createVersion(S.currentAssembly.id,ver,notes);
+        
+        // Clone if source selected
+        if(sourceId){
+          const result=await DB.cloneVersion(sourceId,newVer.id,S.currentAssembly.id);
+          toast(`v${ver} created (${result.nodesCloned} nodes, ${result.linksCloned} links cloned)`);
+        }else{
+          toast(`v${ver} created (empty)`);
+        }
+        
+        // Switch to new version
+        await DB.setCurrentVersion(S.currentAssembly.id,newVer.id);
+        S.versions=await DB.loadVersions(S.currentAssembly.id);
+        S.currentVersion=newVer;
+        S.currentAssembly.current_version_id=newVer.id;
+        renderVersionBar();
+        await loadTreeData();
+      }catch(e){toast(e.message,'err')}
+    }}
+  ]);
+  setTimeout(()=>document.getElementById('mVerNum')?.focus(),100);
+}
+
+async function toggleFreeze(){
+  if(!S.currentVersion)return;
+  const isFrozen=S.currentVersion.status==='frozen'||S.currentVersion.status==='production';
+  const newStatus=isFrozen?'draft':'frozen';
+  try{
+    await DB.updateVersionStatus(S.currentVersion.id,newStatus);
+    S.currentVersion.status=newStatus;
+    const v=S.versions.find(x=>x.id===S.currentVersion.id);
+    if(v)v.status=newStatus;
+    renderVersionBar();
+    toast(isFrozen?'Version unfrozen (editable)':'Version frozen (read-only)');
+  }catch(e){toast(e.message,'err')}
+}
+
+function suggestNextVersion(current){
+  const parts=current.split('.');
+  const major=parseInt(parts[0])||1;
+  const minor=parseInt(parts[1])||0;
+  return major+'.'+(minor+1);
+}
+
+// ============================================================
+// TREE DATA LOADING
+// ============================================================
+async function loadTreeData(){
+  if(!S.currentVersion)return;
+  try{
+    S.nodes=await DB.loadNodes(S.currentVersion.id);
+    S.links=await DB.loadLinks(S.currentVersion.id);
+    
+    // Clear state
+    S.collapsedNodes.clear();
+    S.lockedNodes.clear();
+    
+    // Process nodes
+    S.nodes.forEach(n=>{
+      n.goesInto=[];
+      n.receivesFrom=[];
+      n.level=-1;
+      n.width=calcNodeW(n.name,n.part_number);
+      n.height=calcNodeH(n.name,n.part_number);
+      if(n.is_locked)S.lockedNodes.add(n.id);
+    });
+    
+    // Build relationships
+    const nMap=new Map(S.nodes.map(n=>[n.id,n]));
+    S.links.forEach(l=>{
+      const child=nMap.get(l.child_id),parent=nMap.get(l.parent_id);
+      if(child&&parent){
+        if(!child.goesInto.includes(l.parent_id))child.goesInto.push(l.parent_id);
+        if(!parent.receivesFrom.includes(l.child_id))parent.receivesFrom.push(l.child_id);
+      }
+    });
+    
+    // Calculate levels
+    calcLevels();
+    
+    // Render
+    renderTree();
+    setTimeout(()=>doFit(),150);
+  }catch(e){console.error('loadTree:',e);toast(e.message,'err')}
+}
+
+function calcNodeW(name,pn){let w=NODE_W_BASE;if(name&&name.length>12)w=Math.min(NODE_W_MAX,NODE_W_BASE+(name.length-12)*4);if(pn&&pn.length>10)w=Math.max(w,Math.min(NODE_W_MAX,100+pn.length*4));return w}
+function calcNodeH(name,pn){let h=36;if(pn)h+=10;if(name&&name.length>20)h+=8;return h}
+
+function calcLevels(){
+  S.nodes.forEach(n=>n.level=-1);
+  const roots=S.nodes.filter(n=>n.goesInto.length===0);
+  if(!roots.length){S.nodes.forEach(n=>n.level=1);return}
+  const queue=[],visited=new Set();
+  roots.forEach(r=>{r.level=1;queue.push(r.id);visited.add(r.id)});
+  while(queue.length){
+    const nid=queue.shift();
+    const node=S.nodes.find(n=>n.id===nid);
+    if(!node)continue;
+    node.receivesFrom.forEach(cid=>{
+      const child=S.nodes.find(n=>n.id===cid);
+      if(child){
+        const nl=node.level+1;
+        if(child.level===-1||nl>child.level)child.level=nl;
+        if(!visited.has(cid)){visited.add(cid);queue.push(cid)}
+      }
+    });
+  }
+  S.nodes.forEach(n=>{if(n.level===-1)n.level=1});
+}
+
+// ============================================================
+// TREE LAYOUT
+// ============================================================
+let _zoomBehavior=null, _currentTransform=d3.zoomIdentity;
+
+function calcTreeLayout(){
+  const nodes=S.nodes.filter(n=>!n.deleted);
+  const links=S.links;
+  if(!nodes.length)return null;
+  
+  // Group by level
+  const levelGroups={};
+  let maxLevel=1;
+  nodes.forEach(n=>{
+    const l=n.level||1;
+    if(!levelGroups[l])levelGroups[l]=[];
+    levelGroups[l].push(n);
+    maxLevel=Math.max(maxLevel,l);
+  });
+  
+  const nodeW=150, nodeH=48, vGap=68, groupGap=40, headerH=50, leftPad=120, topPad=80;
+  const levels=Object.keys(levelGroups).map(Number).sort((a,b)=>b-a);
+  
+  // Column X positions
+  const colXMap={};
+  let cumX=leftPad;
+  levels.forEach((level,i)=>{
+    colXMap[level]=cumX;
+    if(i<levels.length-1){
+      const nextLvl=levels[i+1];
+      const lowerLvl=Math.min(level,nextLvl);
+      const gapIdx=lowerLvl-1;
+      const gap=LEVEL_GAPS[Math.min(gapIdx,LEVEL_GAPS.length-1)]||150;
+      cumX+=gap;
+    }
+  });
+  
+  // Build adjacency
+  const childToParents={}, parentToChildren={};
+  links.forEach(l=>{
+    if(!childToParents[l.child_id])childToParents[l.child_id]=[];
+    if(!parentToChildren[l.parent_id])parentToChildren[l.parent_id]=[];
+    childToParents[l.child_id].push(l.parent_id);
+    parentToChildren[l.parent_id].push(l.child_id);
+  });
+  
+  // Detect groups (L2 branches)
+  const l2Nodes=nodes.filter(n=>n.level===2);
+  const groupRoots=l2Nodes.length?l2Nodes:nodes.filter(n=>n.level===3);
+  const groups=[],visited=new Set();
+  
+  groupRoots.sort((a,b)=>(a.sequence_num||9999)-(b.sequence_num||9999));
+  groupRoots.forEach(root=>{
+    if(visited.has(root.id))return;
+    const group={rootId:root.id,nodeIds:new Set()};
+    const q=[root.id];
+    while(q.length){
+      const nid=q.shift();
+      if(group.nodeIds.has(nid))continue;
+      group.nodeIds.add(nid);visited.add(nid);
+      (parentToChildren[nid]||[]).forEach(cid=>{if(!group.nodeIds.has(cid))q.push(cid)});
+    }
+    const parents=childToParents[root.id]||[];
+    parents.forEach(pid=>{group.nodeIds.add(pid);visited.add(pid)});
+    if(group.nodeIds.size)groups.push(group);
+  });
+  
+  const unvisited=nodes.filter(n=>!visited.has(n.id));
+  if(unvisited.length){
+    if(groups.length)unvisited.forEach(n=>groups[groups.length-1].nodeIds.add(n.id));
+    else groups.push({rootId:null,nodeIds:new Set(unvisited.map(n=>n.id))});
+  }
+  
+  // Position nodes
+  const pos={};
+  const nodeToGroup={};
+  groups.forEach((g,gi)=>g.nodeIds.forEach(nid=>nodeToGroup[nid]=gi));
+  
+  // Initial X
+  levels.forEach(level=>{
+    (levelGroups[level]||[]).forEach(n=>{
+      pos[n.id]={x:colXMap[level],y:0,w:nodeW-20,h:nodeH-10,group:nodeToGroup[n.id]||0};
+    });
+  });
+  
+  // Position per group
+  let groupStartY=topPad+headerH;
+  groups.forEach((group,gi)=>{
+    const groupNodesByLevel={};
+    levels.forEach(l=>{
+      groupNodesByLevel[l]=(levelGroups[l]||[]).filter(n=>group.nodeIds.has(n.id));
+    });
+    
+    levels.forEach(level=>{
+      const nlvl=groupNodesByLevel[level]||[];
+      if(!nlvl.length)return;
+      nlvl.sort((a,b)=>(a.sequence_num||9999)-(b.sequence_num||9999));
+      nlvl.forEach((node,idx)=>{
+        const children=parentToChildren[node.id]||[];
+        const childrenInGrp=children.filter(cid=>group.nodeIds.has(cid));
+        if(childrenInGrp.length&&childrenInGrp.some(cid=>pos[cid]?.y>0)){
+          const cYs=childrenInGrp.map(cid=>pos[cid].y);
+          pos[node.id].y=(Math.min(...cYs)+Math.max(...cYs))/2;
+        }else{
+          pos[node.id].y=groupStartY+idx*vGap;
+        }
+      });
+      // Fix overlaps
+      nlvl.sort((a,b)=>pos[a.id].y-pos[b.id].y);
+      let lastY=groupStartY-vGap;
+      nlvl.forEach(n=>{
+        if(S.lockedNodes.has(n.id)&&n.tree_y!=null){pos[n.id].y=n.tree_y;lastY=Math.max(lastY,pos[n.id].y);return}
+        if(pos[n.id].y<lastY+vGap)pos[n.id].y=lastY+vGap;
+        lastY=pos[n.id].y;
+      });
+    });
+    
+    const gNodes=nodes.filter(n=>group.nodeIds.has(n.id));
+    const gYs=gNodes.map(n=>pos[n.id]?.y||0);
+    const gMaxY=Math.max(...gYs);
+    groupStartY=gMaxY+vGap+groupGap;
+  });
+  
+  // Bidirectional centering passes
+  for(let pass=0;pass<4;pass++){
+    [...levels].reverse().forEach(level=>{
+      (levelGroups[level]||[]).forEach(node=>{
+        if(S.lockedNodes.has(node.id))return;
+        const children=(parentToChildren[node.id]||[]).filter(cid=>pos[cid]).map(cid=>pos[cid].y);
+        if(children.length)pos[node.id].y=(Math.min(...children)+Math.max(...children))/2;
+      });
+      const nlvl=(levelGroups[level]||[]).sort((a,b)=>pos[a.id].y-pos[b.id].y);
+      let lastY2=topPad+headerH-vGap;
+      nlvl.forEach(n=>{
+        if(S.lockedNodes.has(n.id)){lastY2=Math.max(lastY2,pos[n.id].y);return}
+        if(pos[n.id].y<lastY2+vGap)pos[n.id].y=lastY2+vGap;
+        lastY2=pos[n.id].y;
+      });
+    });
+  }
+  
+  const maxColX=Math.max(...Object.values(colXMap));
+  const allY=Object.values(pos).map(p=>p.y);
+  const totalW=maxColX+leftPad+nodeW;
+  const totalH=Math.max(...allY,topPad+headerH)+150;
+  
+  return{positions:pos,levels,levelGroups,colXMap,dimensions:{width:totalW,height:totalH},settings:{topPad,headerH,leftPad,nodeW},groups};
+}
+
+// ============================================================
+// TREE RENDERING (D3)
+// ============================================================
+let _allNodes=[];
+
+function renderTree(){
+  const container=document.getElementById('treeContainer');
+  const svg=d3.select('#treeSvg');
+  svg.selectAll('*').remove();
+  
+  if(!S.nodes.length){
+    svg.attr('width',container.clientWidth).attr('height',container.clientHeight);
+    svg.append('text').attr('x',container.clientWidth/2).attr('y',container.clientHeight/2)
+      .attr('text-anchor','middle').attr('fill','#999').attr('font-size','14px')
+      .text(S.isAdmin?'Click + to add a root node':'No nodes in this assembly');
+    return;
+  }
+  
+  const layout=calcTreeLayout();
+  if(!layout)return;
+  
+  const W=container.clientWidth,H=container.clientHeight;
+  svg.attr('width',W).attr('height',H);
+  
+  const visibleNodes=S.nodes.filter(n=>!n.deleted&&isNodeVisible(n));
+  const visibleIds=new Set(visibleNodes.map(n=>n.id));
+  const visibleLinks=S.links.filter(l=>visibleIds.has(l.parent_id)&&visibleIds.has(l.child_id));
+  
+  // Apply positions
+  visibleNodes.forEach(n=>{
+    const p=layout.positions[n.id];
+    if(p){n.treeX=p.x;n.treeY=p.y;n.treeWidth=p.w;n.treeHeight=p.h}
+  });
+  _allNodes=visibleNodes;
+  
+  // Defs
+  const defs=svg.append('defs');
+  defs.append('marker').attr('id','arrow').attr('viewBox','0 0 10 10').attr('refX',9).attr('refY',5).attr('orient','auto').attr('markerWidth',5).attr('markerHeight',5)
+    .append('path').attr('d','M 0,1 L 8,5 L 0,9 z').attr('fill','#888');
+  
+  const g=svg.append('g').attr('class','zoom-group');
+  _zoomBehavior=d3.zoom().scaleExtent([0.1,3]).on('zoom',e=>{_currentTransform=e.transform;g.attr('transform',e.transform)});
+  svg.call(_zoomBehavior);
+  
+  // Level headers
+  if(S.showHeaders){
+    layout.levels.forEach(level=>{
+      const cx=layout.colXMap[level];
+      const hg=g.append('g');
+      hg.append('rect').attr('x',cx-50).attr('y',layout.settings.topPad-5).attr('width',100).attr('height',30).attr('rx',5).attr('fill','#3498db').attr('opacity',.85);
+      hg.append('text').attr('x',cx).attr('y',layout.settings.topPad+15).attr('text-anchor','middle').attr('fill','white').attr('font-size','12px').attr('font-weight','700').text('L'+level);
+    });
+  }
+  
+  // Links
+  const linkLayer=g.append('g').attr('class','link-layer');
+  visibleLinks.forEach(lk=>{
+    const src=visibleNodes.find(n=>n.id===lk.child_id);
+    const tgt=visibleNodes.find(n=>n.id===lk.parent_id);
+    if(!src||!tgt)return;
+    const sx=(src.treeX||src.x)+(src.treeWidth||60)/2, sy=src.treeY||src.y;
+    const tx=(tgt.treeX||tgt.x)-(tgt.treeWidth||60)/2, ty=tgt.treeY||tgt.y;
+    const midX=(sx+tx)/2;
+    const fc=getFastColor(lk.fastener);
+    
+    const lg=linkLayer.append('g').attr('class','link-group').attr('data-src',lk.child_id).attr('data-tgt',lk.parent_id);
+    lg.append('path').attr('class','link-path').attr('d',`M${sx},${sy} C${midX},${sy} ${midX},${ty} ${tx},${ty}`)
+      .attr('stroke',fc).attr('stroke-width',1.5).attr('fill','none').attr('opacity',.7).attr('marker-end','url(#arrow)');
+    
+    // Fastener label
+    if(S.showFast&&(lk.fastener||lk.loctite||lk.torque_value)){
+      const t=lk.label_position||.5;
+      const pathNode=lg.select('path').node();
+      const pt=pathNode.getPointAtLength(t*pathNode.getTotalLength());
+      const lines=[];
+      if(lk.fastener)lines.push({t:lk.fastener+(lk.qty>1?' ×'+lk.qty:''),c:fc,b:true});
+      if(lk.loctite)lines.push({t:'LT-'+lk.loctite,c:'#9b59b6',b:false});
+      if(lk.torque_value)lines.push({t:lk.torque_value+(lk.torque_unit||'Nm'),c:'#e67e22',b:false});
+      const lH=lines.length*12+6, lW=Math.max(55,...lines.map(l=>l.t.length*5.5+14));
+      const fg=lg.append('g').attr('class','fast-label').attr('transform',`translate(${pt.x},${pt.y})`).style('cursor','pointer');
+      fg.append('rect').attr('x',-lW/2).attr('y',-lH/2).attr('width',lW).attr('height',lH).attr('rx',3).attr('fill','white').attr('stroke','#e5e7eb').attr('stroke-width',.5).attr('opacity',.94);
+      lines.forEach((ln,i)=>{
+        fg.append('text').attr('x',0).attr('y',-lH/2+10+i*12).attr('text-anchor','middle').attr('fill',ln.c).attr('font-size','8px').attr('font-weight',ln.b?'700':'400').text(ln.t);
+      });
+      fg.on('click',e=>{e.stopPropagation();if(S.isAdmin&&!S.isFrozen)editLink(lk.id)});
+    }
+  });
+  
+  // Nodes
+  const nodeLayer=g.append('g').attr('class','node-layer');
+  const nodeGs=nodeLayer.selectAll('.node').data(visibleNodes,d=>d.id).enter().append('g').attr('class','node')
+    .attr('transform',d=>`translate(${d.treeX||d.x||400},${d.treeY||d.y||300})`);
+  
+  nodeGs.each(function(d){
+    const sel=d3.select(this);
+    const color=getLvlColor(d.level);
+    const shape=getLvlShape(d.level);
+    const nW=d.treeWidth||d.width;
+    const nH=d.treeHeight||d.height;
+    drawShape(sel,shape,nW,nH,color);
+    
+    // Status dot
+    const sc={'DONE':'#27ae60','IN_PROGRESS':'#f39c12','BLOCKED':'#e74c3c','NOT_STARTED':'#95a5a6','ON_HOLD':'#9b59b6','REVIEW':'#3498db'};
+    sel.append('circle').attr('cx',-nW/2+10).attr('cy',-nH/2+10).attr('r',4).attr('fill',sc[d.status]||'#95a5a6').attr('stroke','white').attr('stroke-width',1.5);
+    
+    // Label
+    const fs=Math.min(getLvlFS(d.level),12);
+    sel.append('text').attr('text-anchor','middle').attr('y',d.part_number?-3:4).attr('font-size',fs+'px').attr('font-weight',getLvlFW(d.level)).text(d.name?.length>18?d.name.slice(0,17)+'…':d.name);
+    if(d.part_number)sel.append('text').attr('text-anchor','middle').attr('y',12).attr('font-size','7px').attr('fill','#888').text(d.part_number);
+    
+    // Sequence badge
+    const seqDisp=d.sequence_tag||(d.sequence_num>0?String(d.sequence_num):null);
+    if(seqDisp&&S.showSeq)sel.append('text').attr('x',nW/2+8).attr('y',-nH/2+4).attr('font-size','12px').attr('font-weight','900').attr('fill','#333').text(seqDisp);
+    
+    // Qty badge
+    if(d.qty>1){
+      sel.append('rect').attr('x',-nW/2+2).attr('y',nH/2-12).attr('width',22).attr('height',12).attr('rx',6).attr('fill','#e74c3c').attr('stroke','white').attr('stroke-width',1);
+      sel.append('text').attr('x',-nW/2+13).attr('y',nH/2-2).attr('text-anchor','middle').attr('fill','white').attr('font-size','8px').attr('font-weight','700').text('×'+d.qty);
+    }
+    
+    // Collapse indicator
+    if(d.receivesFrom.length>0){
+      const isCollapsed=S.collapsedNodes.has(d.id);
+      sel.append('circle').attr('cx',nW/2+12).attr('cy',0).attr('r',7).attr('fill','white').attr('stroke','#ccc').attr('stroke-width',1).style('cursor','pointer')
+        .on('click',e=>{e.stopPropagation();S.collapsedNodes.has(d.id)?S.collapsedNodes.delete(d.id):S.collapsedNodes.add(d.id);renderTree()});
+      sel.append('text').attr('x',nW/2+12).attr('y',0).attr('text-anchor','middle').attr('dy','.35em').attr('font-size','10px').style('pointer-events','none').text(isCollapsed?'+':'−');
+    }
+  });
+  
+  // Drag (vertical, with children)
+  if(S.isAdmin){
+    const treeDrag=d3.drag()
+      .subject((e,d)=>({x:d.treeX||d.x||0,y:d.treeY||d.y||0}))
+      .on('start',(e,d)=>{
+        S.isDragging=true;
+        d._dragStartY=e.subject.y;
+        d._children=getDescendants(d.id);
+        d._initPos={};
+        d._initPos[d.id]=d._dragStartY;
+        d._children.forEach(cid=>{const cn=S.nodes.find(n=>n.id===cid);if(cn)d._initPos[cid]=cn.treeY||cn.y||0});
+      })
+      .on('drag',(e,d)=>{
+        const dy=(e.y-d._dragStartY)*.25;
+        const newY=d._dragStartY+dy;
+        d.treeY=newY;d.tree_y=newY;
+        d3.select(`[data-node-id="${d.id}"]`).attr('transform',`translate(${d.treeX||d.x},${newY})`);
+        d._children.forEach(cid=>{
+          const cn=S.nodes.find(n=>n.id===cid);
+          if(cn){cn.treeY=d._initPos[cid]+dy;cn.tree_y=cn.treeY;
+            d3.selectAll('.node').filter(n=>n.id===cid).attr('transform',`translate(${cn.treeX||cn.x},${cn.treeY})`)}
+        });
+        updateAllLinks();
+      })
+      .on('end',(e,d)=>{
+        S.isDragging=false;
+        delete d._dragStartY;delete d._children;delete d._initPos;
+        markDirty();
+      });
+    nodeGs.call(treeDrag);
+  }
+  
+  // Mark node IDs for drag lookup
+  nodeGs.attr('data-node-id',d=>d.id);
+  
+  // Click + context
+  nodeGs.style('cursor','pointer')
+    .on('click',(e,d)=>{e.stopPropagation();if(S.isDragging)return;showNab(d,e)})
+    .on('contextmenu',(e,d)=>{if(!S.isAdmin)return;e.preventDefault();showNodeCtx(e.clientX,e.clientY,d)});
+  
+  // Click background to deselect
+  svg.on('click',()=>{hideNab();closePanel()});
+  
+  // Legend
+  const legendEl=document.getElementById('legend');
+  const maxLvl=Math.max(...S.nodes.map(n=>n.level));
+  let lHtml='';
+  for(let i=1;i<=maxLvl;i++)lHtml+=`<div class="legend-item"><div class="legend-swatch" style="background:${getLvlColor(i)}"></div>L${i}</div>`;
+  lHtml+=`<div class="legend-item" style="font-weight:700">| ${S.nodes.length} nodes</div>`;
+  legendEl.innerHTML=lHtml;legendEl.style.display='flex';
+  
+  doFit(true);
+}
+
+// ============================================================
+// SHAPE DRAWING
+// ============================================================
+function drawShape(sel,shape,w,h,fill){
+  const hw=w/2,hh=h/2;
+  const stroke=darken(fill,35);
+  const sw=1.5;
+  const shapes={
+    stadium:()=>sel.insert('rect',':first-child').attr('x',-hw).attr('y',-hh).attr('width',w).attr('height',h).attr('rx',hh).attr('ry',hh).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw),
+    octagon:()=>{const c=Math.min(hw,hh)*.35;sel.insert('polygon',':first-child').attr('points',`${-hw+c},${-hh} ${hw-c},${-hh} ${hw},${-hh+c} ${hw},${hh-c} ${hw-c},${hh} ${-hw+c},${hh} ${-hw},${hh-c} ${-hw},${-hh+c}`).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw)},
+    hexagon:()=>sel.insert('polygon',':first-child').attr('points',`${-hw+10},${-hh} ${hw-10},${-hh} ${hw},0 ${hw-10},${hh} ${-hw+10},${hh} ${-hw},0`).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw),
+    pentagon:()=>{const a=(2*Math.PI)/5,sa=-Math.PI/2;const pts=Array.from({length:5},(_,i)=>`${hw*.85*Math.cos(sa+i*a)},${hh*.9*Math.sin(sa+i*a)}`).join(' ');sel.insert('polygon',':first-child').attr('points',pts).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw)},
+    diamond:()=>sel.insert('polygon',':first-child').attr('points',`0,${-hh} ${hw},0 0,${hh} ${-hw},0`).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw),
+    rounded_rectangle:()=>sel.insert('rect',':first-child').attr('x',-hw).attr('y',-hh).attr('width',w).attr('height',h).attr('rx',6).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw),
+    rectangle:()=>sel.insert('rect',':first-child').attr('x',-hw).attr('y',-hh).attr('width',w).attr('height',h).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw),
+    parallelogram:()=>{const sk=10;sel.insert('polygon',':first-child').attr('points',`${-hw+sk},${-hh} ${hw+sk},${-hh} ${hw-sk},${hh} ${-hw-sk},${hh}`).attr('fill',fill).attr('stroke',stroke).attr('stroke-width',sw)}
+  };
+  (shapes[shape]||shapes.rounded_rectangle)();
+}
+
+// ============================================================
+// TREE HELPERS
+// ============================================================
+function isNodeVisible(node){
+  if(node.goesInto.length===0)return true;
+  return!hasCollapsedAncestor(node.id,new Set());
+}
+function hasCollapsedAncestor(nid,visited){
+  if(visited.has(nid))return false;visited.add(nid);
+  const n=S.nodes.find(x=>x.id===nid);if(!n)return false;
+  for(const pid of n.goesInto){if(S.collapsedNodes.has(pid))return true;if(hasCollapsedAncestor(pid,visited))return true}
+  return false;
+}
+
+function getDescendants(nid){
+  const desc=[],visited=new Set();
+  const ptc={};
+  S.links.forEach(l=>{if(!ptc[l.parent_id])ptc[l.parent_id]=[];ptc[l.parent_id].push(l.child_id)});
+  const q=[...(ptc[nid]||[])];
+  while(q.length){const c=q.shift();if(visited.has(c))continue;visited.add(c);desc.push(c);(ptc[c]||[]).forEach(gc=>{if(!visited.has(gc))q.push(gc)})}
+  return desc;
+}
+
+function updateAllLinks(){
+  d3.selectAll('.link-group').each(function(){
+    const lg=d3.select(this);
+    const srcId=lg.attr('data-src'),tgtId=lg.attr('data-tgt');
+    const src=S.nodes.find(n=>n.id===srcId),tgt=S.nodes.find(n=>n.id===tgtId);
+    if(!src||!tgt)return;
+    const sx=(src.treeX||src.x)+(src.treeWidth||60)/2,sy=src.treeY||src.y;
+    const tx=(tgt.treeX||tgt.x)-(tgt.treeWidth||60)/2,ty=tgt.treeY||tgt.y;
+    const midX=(sx+tx)/2;
+    lg.select('.link-path').attr('d',`M${sx},${sy} C${midX},${sy} ${midX},${ty} ${tx},${ty}`);
+    const fl=lg.select('.fast-label');
+    if(fl.node()){
+      const pathNode=lg.select('.link-path').node();
+      const t=.5,pt=pathNode.getPointAtLength(t*pathNode.getTotalLength());
+      fl.attr('transform',`translate(${pt.x},${pt.y})`);
+    }
+  });
+}
+
+let _dirty=false;
+function markDirty(){_dirty=true;const btn=document.getElementById('saveBtn');if(btn){btn.style.background='#ef4444';btn.style.color='#fff';btn.textContent='💾 Save*'}}
+
+async function savePositions(){
+  const updates={};
+  S.nodes.filter(n=>n.treeY!=null).forEach(n=>{updates[n.id]={x:n.treeX||n.x,y:n.treeY,treeY:n.treeY}});
+  const count=await DB.savePositions(updates);
+  _dirty=false;
+  const btn=document.getElementById('saveBtn');if(btn){btn.style.background='';btn.style.color='';btn.textContent='💾 Save'}
+  toast('Saved '+count+' positions');
+}
+
+// ============================================================
+// ZOOM
+// ============================================================
+function doZoomIn(){d3.select('#treeSvg').transition().duration(200).call(_zoomBehavior.scaleBy,1.3)}
+function doZoomOut(){d3.select('#treeSvg').transition().duration(200).call(_zoomBehavior.scaleBy,.7)}
+function doFit(instant){
+  if(!_zoomBehavior||!S.nodes.length)return;
+  const cont=document.getElementById('treeContainer');
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  S.nodes.forEach(n=>{if(n.deleted)return;const nx=n.treeX||n.x||400,ny=n.treeY||n.y||300;minX=Math.min(minX,nx-80);maxX=Math.max(maxX,nx+80);minY=Math.min(minY,ny-40);maxY=Math.max(maxY,ny+40)});
+  const cw=maxX-minX,ch=maxY-minY;
+  const scale=Math.min(cont.clientWidth/cw,cont.clientHeight/ch,1.5)*.9;
+  const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+  const t=d3.zoomIdentity.translate(cont.clientWidth/2-cx*scale,cont.clientHeight/2-cy*scale).scale(scale);
+  const svg=d3.select('#treeSvg');
+  if(instant)svg.call(_zoomBehavior.transform,t);
+  else svg.transition().duration(400).call(_zoomBehavior.transform,t);
+}
+
+// ============================================================
+// NODE ACTIONS (Action Bar + Context Menu)
+// ============================================================
+function showNab(node,event){
+  const bar=document.getElementById('nodeActionBar');
+  if(_nabNodeId===node.id&&bar.classList.contains('show')){hideNab();return}
+  _nabNodeId=node.id;
+  const cont=document.getElementById('treeContainer').getBoundingClientRect();
+  bar.style.left=(event.clientX-cont.left-70)+'px';
+  bar.style.top=(event.clientY-cont.top-50)+'px';
+  bar.classList.add('show');
+  
+  // Wire buttons
+  replaceBtn('nabAdd',()=>{hideNab();addChildNode(node.id)});
+  replaceBtn('nabEdit',()=>{hideNab();editNodePanel(node.id)});
+  replaceBtn('nabLink',()=>{hideNab();editLink(null,node.id)});
+  replaceBtn('nabDel',()=>{hideNab();confirmDeleteNode(node.id)});
+}
+
+function replaceBtn(id,handler){
+  const old=document.getElementById(id);if(!old)return;
+  const clone=old.cloneNode(true);clone.addEventListener('click',e=>{e.stopPropagation();handler()});
+  old.parentNode.replaceChild(clone,old);
+}
+
+function showNodeCtx(x,y,node){
+  showCtx(x,y,[
+    {label:'➕ Add Child',action:()=>addChildNode(node.id)},
+    {label:'✏️ Edit Node',action:()=>editNodePanel(node.id)},
+    {label:'🔩 Edit Links',action:()=>editLink(null,node.id)},
+    {sep:true},
+    {label:'🗑️ Delete Node',danger:true,action:()=>confirmDeleteNode(node.id)}
+  ]);
+}
+
+// ============================================================
+// NODE CRUD
+// ============================================================
+async function addChildNode(parentId){
+  if(!S.isAdmin||!S.currentVersion)return;
+  const parent=S.nodes.find(n=>n.id===parentId);
+  showModal('Add Child Node',`
+    <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="mNodeName" placeholder="Node name"></div>
+    <div class="form-group"><label class="form-label">Part Number (optional)</label><input class="form-input" id="mNodePN" placeholder="Part number"></div>
+    <div class="form-group"><label class="form-label">Fastener (optional)</label><input class="form-input" id="mNodeFast" placeholder="e.g. M6x20"></div>
+  `,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Add',action:async()=>{
+      const name=document.getElementById('mNodeName').value.trim();
+      if(!name){toast('Name required','err');return}
+      try{
+        const node=await DB.createNode({assembly_id:S.currentAssembly.id,version_id:S.currentVersion.id,name,part_number:document.getElementById('mNodePN').value.trim()||null,
+          x:(parent?.treeX||parent?.x||400)-200,y:(parent?.treeY||parent?.y||300),status:'NOT_STARTED',deleted:false});
+        const fast=document.getElementById('mNodeFast').value.trim();
+        await DB.createLink({assembly_id:S.currentAssembly.id,version_id:S.currentVersion.id,parent_id:parentId,child_id:node.id,fastener:fast||null,qty:1,deleted:false});
+        hideModal();toast('Node added');await loadTreeData();
+      }catch(e){toast(e.message,'err')}
+    }}
+  ]);
+  setTimeout(()=>document.getElementById('mNodeName')?.focus(),100);
+}
+
+function editNodePanel(nodeId){
+  const node=S.nodes.find(n=>n.id===nodeId);if(!node)return;
+  openPanel('Edit Node',`
+    <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="epName" value="${esc(node.name||'')}"></div>
+    <div class="form-group"><label class="form-label">Part Number</label><input class="form-input" id="epPN" value="${esc(node.part_number||'')}"></div>
+    <div class="form-group"><label class="form-label">Status</label>
+      <select class="form-select" id="epStatus">
+        ${['NOT_STARTED','IN_PROGRESS','DONE','BLOCKED','ON_HOLD','REVIEW'].map(s=>`<option value="${s}"${node.status===s?' selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="epQty" value="${node.qty||1}" min="1"></div>
+    <div class="form-group"><label class="form-label">Sequence Tag</label><input class="form-input" id="epSeq" value="${esc(node.sequence_tag||'')}" placeholder="e.g. 1a, 2b"></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="epNotes">${esc(node.notes||'')}</textarea></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px">Level: L${node.level}</div>
+  `,[
+    {label:'Cancel',cls:'sp-btn-secondary',action:closePanel},
+    {label:'Save',action:async()=>{
+      const updates={name:document.getElementById('epName').value.trim(),part_number:document.getElementById('epPN').value.trim()||null,
+        status:document.getElementById('epStatus').value,qty:parseInt(document.getElementById('epQty').value)||1,
+        sequence_tag:document.getElementById('epSeq').value.trim()||null,notes:document.getElementById('epNotes').value.trim()||null};
+      if(!updates.name){toast('Name required','err');return}
+      const ok=await DB.updateNode(nodeId,updates);
+      if(ok){closePanel();toast('Node updated');await loadTreeData()}
+    }}
+  ]);
+}
+
+function confirmDeleteNode(nodeId){
+  const node=S.nodes.find(n=>n.id===nodeId);if(!node)return;
+  showModal('Delete Node',`<p>Delete "<strong>${esc(node.name)}</strong>"?</p><p style="color:var(--red);font-size:12px;margin-top:8px">⚠️ All links to this node will also be deleted.</p>`,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Delete',cls:'btn-danger',action:async()=>{
+      const ok=await DB.deleteNode(nodeId);
+      if(ok){hideModal();toast('Node deleted');await loadTreeData()}
+    }}
+  ]);
+}
+
+// ============================================================
+// LINK EDITING
+// ============================================================
+function editLink(linkId, nodeId){
+  let link=linkId?S.links.find(l=>l.id===linkId):null;
+  if(!link&&nodeId){
+    const outLinks=S.links.filter(l=>l.child_id===nodeId);
+    if(outLinks.length)link=outLinks[0];
+  }
+  if(!link){toast('No link found','err');return}
+  
+  openPanel('Edit Link',`
+    <div class="form-group"><label class="form-label">Fastener</label><input class="form-input" id="elFast" value="${esc(link.fastener||'')}" placeholder="e.g. M6x20, CBE10"></div>
+    <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="elQty" value="${link.qty||1}" min="1"></div>
+    <div class="form-group"><label class="form-label">Loctite</label>
+      <select class="form-select" id="elLT">
+        <option value="">None</option>
+        ${['222','243','262','271','290','425','648'].map(v=>`<option value="${v}"${link.loctite===v?' selected':''}>${v}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Torque</label><input class="form-input" id="elTQ" value="${link.torque_value||''}" placeholder="e.g. 25"></div>
+  `,[
+    {label:'Cancel',cls:'sp-btn-secondary',action:closePanel},
+    {label:'Save',action:async()=>{
+      const ok=await DB.updateLink(link.id,{
+        fastener:document.getElementById('elFast').value.trim()||null,
+        qty:parseInt(document.getElementById('elQty').value)||1,
+        loctite:document.getElementById('elLT').value||null,
+        torque_value:document.getElementById('elTQ').value.trim()?parseFloat(document.getElementById('elTQ').value):null
+      });
+      if(ok){closePanel();toast('Link updated');await loadTreeData()}
+    }}
+  ]);
+}
+
+// ============================================================
+// BOM
+// ============================================================
+function openBOM(){
+  if(!S.nodes.length){toast('No nodes','err');return}
+  document.getElementById('bomTitle').textContent=(S.currentAssembly?.name||'Assembly')+' v'+(S.currentVersion?.version||'?');
+  
+  // Build BOM: group by L2 parent
+  const l2Nodes=S.nodes.filter(n=>n.level===2).sort((a,b)=>(a.sequence_num||9999)-(b.sequence_num||9999));
+  const ptc={};
+  S.links.forEach(l=>{if(!ptc[l.parent_id])ptc[l.parent_id]=[];ptc[l.parent_id].push(l)});
+  
+  let html='<table class="bom-table"><thead><tr><th>#</th><th>Name</th><th>P/N</th><th>Qty</th><th>Fastener</th><th>Loctite</th><th>Torque</th></tr></thead><tbody>';
+  let idx=1;
+  
+  function addBomGroup(parentNode, indent){
+    const children=ptc[parentNode.id]||[];
+    children.forEach(link=>{
+      const child=S.nodes.find(n=>n.id===link.child_id);
+      if(!child)return;
+      html+=`<tr><td>${idx++}</td><td style="padding-left:${indent*16}px">${esc(child.name)}</td><td class="mono" style="font-size:10px">${esc(child.part_number||'')}</td><td>${child.qty||1}</td>
+        <td class="mono" style="font-size:10px">${esc(link.fastener||'')}</td><td>${esc(link.loctite||'')}</td><td>${link.torque_value?link.torque_value+(link.torque_unit||'Nm'):''}</td></tr>`;
+      addBomGroup(child,indent+1);
+    });
+  }
+  
+  if(l2Nodes.length){
+    l2Nodes.forEach(l2=>{
+      html+=`<tr class="bom-grp-row"><td colspan="7" style="padding:8px 10px">${esc(l2.name)}</td></tr>`;
+      addBomGroup(l2,1);
+    });
+  }else{
+    const roots=S.nodes.filter(n=>n.goesInto.length===0);
+    roots.forEach(r=>addBomGroup(r,0));
+  }
+  
+  html+='</tbody></table>';
+  document.getElementById('bomBody').innerHTML=html;
+  document.getElementById('bomOverlay').classList.add('show');
+}
+function closeBOM(){document.getElementById('bomOverlay').classList.remove('show')}
+
+// ============================================================
+// TOGGLE BUTTONS
+// ============================================================
+function toggleSeq(){S.showSeq=!S.showSeq;document.getElementById('seqToggle').classList.toggle('active',S.showSeq);renderTree()}
+function toggleParts(){S.showParts=!S.showParts;document.getElementById('partsToggle').classList.toggle('active',S.showParts);renderTree()}
+function toggleFast(){S.showFast=!S.showFast;document.getElementById('fastToggle').classList.toggle('active',S.showFast);renderTree()}
+function toggleHeaders(){S.showHeaders=!S.showHeaders;document.getElementById('headersToggle').classList.toggle('active',S.showHeaders);renderTree()}
+
+// ============================================================
+// FAB — Add Root Node
+// ============================================================
+document.getElementById('treeContainer').addEventListener('contextmenu',e=>{
+  if(!S.isAdmin||S.page!=='tree')return;
+  if(e.target.tagName==='svg'||e.target.closest('svg')&&!e.target.closest('.node')){
+    e.preventDefault();
+    const roots=S.nodes.filter(n=>n.goesInto.length===0);
+    if(roots.length>0)return; // Only one root
+    showCtx(e.clientX,e.clientY,[{label:'➕ Add Root Node (L1)',action:()=>addRootNode()}]);
+  }
+});
+
+async function addRootNode(){
+  showModal('Add Root Node',`
+    <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="mRootName" placeholder="Root node name"></div>
+    <div class="form-group"><label class="form-label">Part Number (optional)</label><input class="form-input" id="mRootPN" placeholder="Part number"></div>
+  `,[
+    {label:'Cancel',cls:'btn-secondary',action:hideModal},
+    {label:'Add',action:async()=>{
+      const name=document.getElementById('mRootName').value.trim();
+      if(!name){toast('Name required','err');return}
+      try{
+        await DB.createNode({assembly_id:S.currentAssembly.id,version_id:S.currentVersion.id,name,part_number:document.getElementById('mRootPN').value.trim()||null,x:400,y:300,status:'NOT_STARTED',deleted:false});
+        hideModal();toast('Root node added');await loadTreeData();
+      }catch(e){toast(e.message,'err')}
+    }}
+  ]);
+  setTimeout(()=>document.getElementById('mRootName')?.focus(),100);
+}
+
+// ============================================================
+// KEYBOARD + GLOBAL EVENTS
+// ============================================================
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideCtx();hideNab();hideModal();closePanel();closeBOM()}});
+document.addEventListener('click',e=>{if(!e.target.closest('.ctx-menu'))hideCtx();if(!e.target.closest('.nab')&&!e.target.closest('.node'))hideNab()});
+window.addEventListener('resize',()=>{if(S.page==='tree'&&S.nodes.length)renderTree()});
+
+// ============================================================
+// INIT
+// ============================================================
+async function init(){
+  console.log('EagleEye+ initializing...');
+  try{
+    const{data,error}=await sb.from('logi_projects').select('id').limit(1);
+    document.getElementById('dbDot').classList.add(error?'err':'ok');
+    if(error)toast('DB connection failed','err');
+  }catch(e){document.getElementById('dbDot').classList.add('err')}
+  
+  await checkAuth();
+  await loadProjects();
+  navigateTo('home');
+  console.log('EagleEye+ ready');
+}
+
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
