@@ -420,6 +420,23 @@ const DB = {
     return data;
   },
 
+  // Batch insert nodes — returns array of created nodes with IDs
+  async bulkCreateNodes(nodes){
+    if(!nodes.length)return[];
+    // Supabase handles arrays natively
+    const{data,error}=await sb.from('logi_nodes').insert(nodes).select();
+    if(error)throw error;
+    return data||[];
+  },
+
+  // Batch insert links
+  async bulkCreateLinks(links){
+    if(!links.length)return[];
+    const{data,error}=await sb.from('logi_links').insert(links).select();
+    if(error)throw error;
+    return data||[];
+  },
+
   async updateNode(nodeId, updates){
     const{error}=await sb.from('logi_nodes').update(updates).eq('id',nodeId);
     return!error;
@@ -478,69 +495,78 @@ const DB = {
     return!error;
   },
 
-  // Clone version (nodes + links)
+  // Clone version (nodes + links) — uses batch inserts
   async cloneVersion(sourceVersionId, newVersionId, assemblyId){
-    // 1. Load source nodes by version_id
+    // 1. Load source nodes
     const srcNodes = await this.loadNodes(sourceVersionId);
     if(!srcNodes.length) return { nodesCloned: 0, linksCloned: 0 };
     const srcNodeIds = new Set(srcNodes.map(n=>n.id));
     console.log('[Clone] Source nodes: '+srcNodes.length);
     
-    // 2. ALWAYS load ALL links for this assembly — ignore version_id for reading
-    //    Then keep only links connecting our source nodes
+    // 2. Load ALL links for this assembly, filter to source nodes
     const{data:rawLinks,error:le}=await sb.from('logi_links').select('*').eq('assembly_id',assemblyId);
     if(le) console.error('[Clone] Link load error:',le);
     const allActive=(rawLinks||[]).filter(l=>l.deleted!==true);
     const srcLinks=allActive.filter(l=>srcNodeIds.has(l.parent_id)&&srcNodeIds.has(l.child_id));
-    console.log('[Clone] Assembly has '+allActive.length+' total links, '+srcLinks.length+' connect source nodes');
+    console.log('[Clone] '+allActive.length+' total links, '+srcLinks.length+' connect source nodes');
     
-    // 3. Auto-repair: tag unversioned source links
-    let repaired=0;
-    for(const l of srcLinks){
-      if(!l.version_id){
-        await sb.from('logi_links').update({version_id:sourceVersionId}).eq('id',l.id);
-        repaired++;
-      }
-    }
-    if(repaired) console.log('[Clone] Auto-repaired '+repaired+' unversioned links');
-    
-    // 4. Clone nodes
-    const idMap = new Map();
-    for(const n of srcNodes){
-      try{
-        const created = await this.createNode({
-          assembly_id:assemblyId, version_id:newVersionId,
-          name:n.name, part_number:n.part_number,
-          status:n.status||'NOT_STARTED', qty:n.qty||1,
-          group_num:n.group_num||0, sequence_num:n.sequence_num||0,
-          sequence_tag:n.sequence_tag||null, notes:n.notes||null,
-          x:n.x, y:n.y, tree_y:n.tree_y||null,
-          is_locked:n.is_locked||false, deleted:false
-        });
-        idMap.set(n.id, created.id);
-      }catch(e){console.error('[Clone] Node error:',n.name,e)}
+    // 3. Auto-repair unversioned links
+    const unversioned=srcLinks.filter(l=>!l.version_id);
+    if(unversioned.length){
+      for(const l of unversioned)await sb.from('logi_links').update({version_id:sourceVersionId}).eq('id',l.id);
+      console.log('[Clone] Repaired '+unversioned.length+' unversioned links');
     }
     
-    // 5. Clone links with remapped IDs
-    let linksCloned=0, linksSkipped=0;
-    for(const l of srcLinks){
+    // 4. BATCH insert cloned nodes
+    const nodeInserts=srcNodes.map(n=>({
+      assembly_id:assemblyId, version_id:newVersionId,
+      name:n.name, part_number:n.part_number,
+      status:n.status||'NOT_STARTED', qty:n.qty||1,
+      group_num:n.group_num||0, sequence_num:n.sequence_num||0,
+      sequence_tag:n.sequence_tag||null, notes:n.notes||null,
+      x:n.x, y:n.y, tree_y:n.tree_y||null,
+      is_locked:n.is_locked||false, deleted:false
+    }));
+    
+    const createdNodes=await this.bulkCreateNodes(nodeInserts);
+    console.log('[Clone] Batch inserted '+createdNodes.length+' nodes');
+    
+    // Build ID mapping: old ID → new ID (match by array order)
+    const idMap=new Map();
+    srcNodes.forEach((orig,i)=>{
+      if(i<createdNodes.length) idMap.set(orig.id, createdNodes[i].id);
+    });
+    // Fallback: match by name
+    const nameToOldId=new Map(srcNodes.map(n=>[n.name,n.id]));
+    createdNodes.forEach(cn=>{
+      const oldId=nameToOldId.get(cn.name);
+      if(oldId&&!idMap.has(oldId)) idMap.set(oldId,cn.id);
+    });
+    
+    // 5. BATCH insert cloned links
+    const linkInserts=[];
+    let skipped=0;
+    srcLinks.forEach(l=>{
       const np=idMap.get(l.parent_id), nc=idMap.get(l.child_id);
-      if(!np||!nc){linksSkipped++;continue}
-      try{
-        await this.createLink({
-          assembly_id:assemblyId, version_id:newVersionId,
-          parent_id:np, child_id:nc,
-          fastener:l.fastener||null, qty:l.qty||1,
-          loctite:l.loctite||null, torque_value:l.torque_value||null,
-          torque_unit:l.torque_unit||null, label_position:l.label_position||null,
-          deleted:false
-        });
-        linksCloned++;
-      }catch(e){console.error('[Clone] Link error:',e);linksSkipped++}
+      if(!np||!nc){skipped++;return}
+      linkInserts.push({
+        assembly_id:assemblyId, version_id:newVersionId,
+        parent_id:np, child_id:nc,
+        fastener:l.fastener||null, qty:l.qty||1,
+        loctite:l.loctite||null, torque_value:l.torque_value||null,
+        torque_unit:l.torque_unit||null, label_position:l.label_position||null,
+        deleted:false
+      });
+    });
+    
+    let linksCloned=0;
+    if(linkInserts.length){
+      const createdLinks=await this.bulkCreateLinks(linkInserts);
+      linksCloned=createdLinks.length;
     }
     
-    console.log('[Clone] DONE: '+idMap.size+' nodes, '+linksCloned+' links ('+linksSkipped+' skipped)');
-    return { nodesCloned: idMap.size, linksCloned };
+    console.log('[Clone] DONE: '+createdNodes.length+' nodes, '+linksCloned+' links ('+skipped+' skipped)');
+    return { nodesCloned: createdNodes.length, linksCloned };
   },
 
   // Save node positions
@@ -1809,15 +1835,20 @@ function handleCSVFiles(event){
 }
 
 function parseCSV(text,fileName){
+  // Strip BOM and normalize line endings
+  text=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
   const lines=text.trim().split('\n');
   if(lines.length<2)return{error:'CSV must have header + at least one data row'};
   
   const header=parseCSVLine(lines[0]).map(h=>h.toLowerCase().trim());
+  console.log('[CSV] Header columns:',header);
   
   // Detect format: BOM/Level format vs child/parent format
   const levelIdx=header.findIndex(h=>h==='level');
   const compIdx=header.findIndex(h=>h==='component'||h==='name'||h==='child'||h==='child_name');
   const parentIdx=header.findIndex(h=>h==='parent'||h==='parent_name');
+  
+  console.log('[CSV] Format detection: levelIdx='+levelIdx+' compIdx='+compIdx+' parentIdx='+parentIdx+' → '+(levelIdx!==-1?'BOM/Level':'child/parent'));
   
   if(compIdx===-1)return{error:'CSV needs a "component", "child", or "name" column'};
   
@@ -1879,6 +1910,9 @@ function parseCSV(text,fileName){
     const nodes=Array.from(nodeMap.values());
     const childNames=new Set(links.map(l=>l.child_name));
     const rootNodes=nodes.filter(n=>!childNames.has(n.name));
+    console.log('[CSV Parse] BOM format: '+nodes.length+' nodes, '+links.length+' links, '+rootNodes.length+' roots');
+    console.log('[CSV Parse] idMap keys sample:',nodes.slice(0,5).map(n=>'"'+n.name+'"').join(', '));
+    console.log('[CSV Parse] Link samples:',links.slice(0,5).map(l=>'"'+l.child_name+'" → "'+l.parent_name+'"').join(' | '));
     return{nodes,links,rootNodes};
   }
   
@@ -1966,17 +2000,16 @@ function showImportPreview(parsedFiles){
     </div>
     
     <div style="margin-top:10px;font-size:9px;color:var(--dim)">
-      CSV format: <code>child,parent,child_pn,fastener,qty,loctite,torque</code><br>
-      Only <code>child</code> column is required. <code>parent</code> defines connections.
+      CSV formats: <code>#,Level,Component,Part Number,Qty,...</code> (BOM) or <code>child,parent,...</code><br>
+      ${totalLinks===0?'<span style="color:#ef4444;font-weight:700">⚠️ 0 links detected — tree hierarchy will not be created. Check CSV has Level or parent column.</span>':''}
     </div>
   `,[
     {label:'Cancel',cls:'btn-secondary',action:hideModal},
-    {label:'Import '+totalNodes+' Nodes',action:()=>performImport(parsedFiles)}
+    {label:'Import '+totalNodes+' Nodes + '+totalLinks+' Links',action:()=>performImport(parsedFiles)}
   ]);
 }
 
 async function performImport(parsedFiles){
-  // Read values before hiding modal
   const attachParentEl=document.getElementById('mImportParent');
   const attachFastEl=document.getElementById('mImportFastener');
   const mergeEl=document.getElementById('mImportMerge');
@@ -1993,63 +2026,77 @@ async function performImport(parsedFiles){
   let totalNodes=0,totalLinks=0;
   
   try{
-    const batchNameMap=new Map();
-    
     for(const parsed of parsedFiles){
       const{nodes,links,rootNodes}=parsed;
-      const idMap=new Map();
-      const existingNameMap=new Map();
+      console.log('[Import] File: '+(parsed.fileName||'csv')+' — '+nodes.length+' nodes, '+links.length+' links parsed');
       
+      const idMap=new Map(); // CSV name → Supabase UUID
+      const existingNameMap=new Map();
       if(mergeEnabled){
         S.nodes.forEach(n=>existingNameMap.set(n.name.toLowerCase(),n.id));
-        batchNameMap.forEach((id,name)=>existingNameMap.set(name,id));
       }
       
-      // Calculate auto-layout positions
+      // Calculate positions
       const positions=calcImportLayout(nodes,links);
       
-      // Insert nodes
-      const nodesToInsert=[];
+      // Build node insert array (preserving name order)
+      const nodeNames=[]; // parallel array to track which name maps to which insert
+      const nodeInserts=[];
       nodes.forEach((node,index)=>{
         const existingId=existingNameMap.get(node.name.toLowerCase());
         if(existingId){idMap.set(node.name,existingId);return}
         
         const pos=positions.get(node.name)||{x:200+(index%5)*180,y:100+Math.floor(index/5)*140};
-        const newNode={
+        nodeNames.push(node.name);
+        nodeInserts.push({
           assembly_id:assemblyId,version_id:versionId,
-          name:node.name,part_number:node.pn||null,
-          qty:node.qty||1,
+          name:node.name,part_number:node.pn||null,qty:node.qty||1,
           x:pos.x,y:pos.y,status:'NOT_STARTED',deleted:false
-        };
-        nodesToInsert.push({...newNode,_name:node.name});
-      });
-      
-      for(const n of nodesToInsert){
-        const name=n._name;delete n._name;
-        const created=await DB.createNode(n);
-        idMap.set(name,created.id);
-        if(mergeEnabled)batchNameMap.set(name.toLowerCase(),created.id);
-      }
-      
-      // Insert internal links
-      const linksToInsert=[];
-      links.forEach(l=>{
-        const pid=idMap.get(l.parent_name);
-        const cid=idMap.get(l.child_name);
-        if(pid&&cid)linksToInsert.push({
-          assembly_id:assemblyId,version_id:versionId,
-          parent_id:pid,child_id:cid,
-          fastener:l.fastener,qty:l.qty||1,
-          loctite:l.loctite,torque_value:l.torque_value,
-          torque_unit:l.torque_unit,deleted:false
         });
       });
       
-      // Attachment links (root nodes → selected parent)
+      // BATCH INSERT all nodes at once
+      console.log('[Import] Inserting '+nodeInserts.length+' nodes in batch...');
+      const createdNodes=await DB.bulkCreateNodes(nodeInserts);
+      console.log('[Import] Supabase returned '+createdNodes.length+' nodes');
+      
+      // Map names to IDs — match by array order (Supabase returns in insertion order)
+      createdNodes.forEach((created,i)=>{
+        if(i<nodeNames.length) idMap.set(nodeNames[i],created.id);
+      });
+      
+      // Fallback: if order isn't guaranteed, also match by name
+      createdNodes.forEach(created=>{
+        if(!idMap.has(created.name)) idMap.set(created.name,created.id);
+      });
+      
+      console.log('[Import] idMap has '+idMap.size+' entries ('+nodeNames.length+' new + '+(idMap.size-nodeNames.length)+' existing)');
+      
+      // Build links
+      const linkInserts=[];
+      let linksSkipped=0;
+      links.forEach((l,i)=>{
+        const pid=idMap.get(l.parent_name);
+        const cid=idMap.get(l.child_name);
+        if(!pid||!cid){
+          linksSkipped++;
+          if(linksSkipped<=10)console.warn('[Import] Link skipped: "'+l.child_name+'"→"'+l.parent_name+'" parent='+(pid?'✓':'✗')+' child='+(cid?'✓':'✗'));
+          return;
+        }
+        linkInserts.push({
+          assembly_id:assemblyId,version_id:versionId,
+          parent_id:pid,child_id:cid,
+          fastener:l.fastener||null,qty:l.qty||1,
+          loctite:l.loctite||null,torque_value:l.torque_value||null,
+          torque_unit:l.torque_unit||null,deleted:false
+        });
+      });
+      
+      // Attachment links
       if(attachParentId){
         rootNodes.forEach(rn=>{
           const rid=idMap.get(rn.name);
-          if(rid)linksToInsert.push({
+          if(rid)linkInserts.push({
             assembly_id:assemblyId,version_id:versionId,
             parent_id:attachParentId,child_id:rid,
             fastener:attachFastener||null,qty:1,deleted:false
@@ -2057,16 +2104,22 @@ async function performImport(parsedFiles){
         });
       }
       
-      for(const l of linksToInsert)await DB.createLink(l);
+      // BATCH INSERT all links at once
+      console.log('[Import] Inserting '+linkInserts.length+' links in batch ('+linksSkipped+' skipped)...');
+      if(linkInserts.length>0){
+        const createdLinks=await DB.bulkCreateLinks(linkInserts);
+        console.log('[Import] Supabase returned '+createdLinks.length+' links');
+        totalLinks+=createdLinks.length;
+      }
       
-      totalNodes+=nodesToInsert.length;
-      totalLinks+=linksToInsert.length;
+      totalNodes+=createdNodes.length;
     }
     
     toast(`Imported ${totalNodes} nodes, ${totalLinks} links`);
+    console.log('[Import] DONE: '+totalNodes+' nodes, '+totalLinks+' links');
     await loadTreeData();
   }catch(e){
-    console.error('Import error:',e);
+    console.error('[Import] FATAL:',e);
     toast('Import failed: '+e.message,'err');
   }
 }
