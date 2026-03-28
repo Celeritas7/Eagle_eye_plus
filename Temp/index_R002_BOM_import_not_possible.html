@@ -1811,81 +1811,21 @@ function parseCSV(text,fileName){
   if(lines.length<2)return{error:'CSV must have header + at least one data row'};
   
   const header=parseCSVLine(lines[0]).map(h=>h.toLowerCase().trim());
-  
-  // Detect format: BOM/Level format vs child/parent format
-  const levelIdx=header.findIndex(h=>h==='level');
-  const compIdx=header.findIndex(h=>h==='component'||h==='name'||h==='child'||h==='child_name');
+  const childIdx=header.findIndex(h=>h==='child'||h==='child_name'||h==='name');
   const parentIdx=header.findIndex(h=>h==='parent'||h==='parent_name');
+  if(childIdx===-1)return{error:'CSV must have "child" or "name" column'};
   
-  if(compIdx===-1)return{error:'CSV needs a "component", "child", or "name" column'};
-  
-  const pnIdx=header.findIndex(h=>h==='part number'||h==='part_number'||h==='child_pn'||h==='pn');
-  const qtyIdx=header.findIndex(h=>h==='qty'||h==='quantity');
+  const pnIdx=header.findIndex(h=>h==='child_pn'||h==='part_number'||h==='pn');
   const fastIdx=header.findIndex(h=>h==='fastener');
-  const fqIdx=header.findIndex(h=>h==='f.qty'||h==='fqty'||h==='fastener_qty');
+  const qtyIdx=header.findIndex(h=>h==='qty'||h==='quantity');
   const ltIdx=header.findIndex(h=>h==='loctite'||h==='lt');
   const tqIdx=header.findIndex(h=>h==='torque'||h==='torque_value');
   
-  // ── BOM/LEVEL FORMAT (Axon export) ──
-  // Hierarchy from Level column: L1 root, L2 child of L1, L3 child of nearest L2 above, etc.
-  if(levelIdx!==-1){
-    const nodeMap=new Map(),links=[];
-    const parentStack={}; // level -> most recent node name at that level
-    let dupeCounter={}; // handle duplicate names by appending suffix
-    
-    for(let i=1;i<lines.length;i++){
-      const vals=parseCSVLine(lines[i]);
-      if(!vals.length||vals.every(v=>!v.trim()))continue;
-      
-      let name=(vals[compIdx]||'').trim();
-      if(!name)continue;
-      const levelStr=(vals[levelIdx]||'').trim().replace(/^L/i,'');
-      const level=parseInt(levelStr)||1;
-      const pn=pnIdx!==-1?(vals[pnIdx]||'').trim():'';
-      const qty=qtyIdx!==-1?parseInt(vals[qtyIdx])||1:1;
-      const fast=fastIdx!==-1?(vals[fastIdx]||'').trim():'';
-      const fq=fqIdx!==-1?parseInt(vals[fqIdx])||1:1;
-      const lt=ltIdx!==-1?(vals[ltIdx]||'').replace(/^LT-/i,'').trim():'';
-      const tq=tqIdx!==-1?parseFloat(vals[tqIdx])||null:null;
-      
-      // Handle duplicate component names — append suffix to make unique
-      if(nodeMap.has(name)){
-        if(!dupeCounter[name])dupeCounter[name]=1;
-        dupeCounter[name]++;
-        name=name+' ('+dupeCounter[name]+')';
-      }
-      
-      nodeMap.set(name,{name,pn:pn||null,qty});
-      parentStack[level]=name;
-      
-      // Find parent: nearest node at level-1 above this row
-      if(level>1){
-        const parentName=parentStack[level-1];
-        if(parentName){
-          links.push({
-            parent_name:parentName, child_name:name,
-            fastener:fast||null, qty:fq, 
-            loctite:lt||null, torque_value:tq, torque_unit:tq?'Nm':null
-          });
-        }
-      }
-      
-      // Clear deeper levels (they're no longer valid parents)
-      Object.keys(parentStack).forEach(k=>{if(parseInt(k)>level)delete parentStack[k]});
-    }
-    
-    const nodes=Array.from(nodeMap.values());
-    const childNames=new Set(links.map(l=>l.child_name));
-    const rootNodes=nodes.filter(n=>!childNames.has(n.name));
-    return{nodes,links,rootNodes};
-  }
-  
-  // ── CHILD/PARENT FORMAT ──
   const nodeMap=new Map(),links=[];
   for(let i=1;i<lines.length;i++){
     const vals=parseCSVLine(lines[i]);
     if(!vals.length||vals.every(v=>!v.trim()))continue;
-    const child=(vals[compIdx]||'').trim();
+    const child=(vals[childIdx]||'').trim();
     const parent=parentIdx!==-1?(vals[parentIdx]||'').trim():'';
     if(!child)continue;
     
@@ -1905,6 +1845,7 @@ function parseCSV(text,fileName){
   const nodes=Array.from(nodeMap.values());
   const childNames=new Set(links.map(l=>l.child_name));
   const rootNodes=nodes.filter(n=>!childNames.has(n.name));
+  
   return{nodes,links,rootNodes};
 }
 
@@ -2016,7 +1957,6 @@ async function performImport(parsedFiles){
         const newNode={
           assembly_id:assemblyId,version_id:versionId,
           name:node.name,part_number:node.pn||null,
-          qty:node.qty||1,
           x:pos.x,y:pos.y,status:'NOT_STARTED',deleted:false
         };
         nodesToInsert.push({...newNode,_name:node.name});
@@ -2108,48 +2048,36 @@ function calcImportLayout(nodes,links){
 function exportCSV(){
   if(!S.nodes.length){toast('No nodes to export','err');return}
   
-  // Build parent→children map
+  // Build CSV: child,parent,child_pn,fastener,qty,loctite,torque
   const ptc={};
   S.links.forEach(l=>{
-    if(!ptc[l.parent_id])ptc[l.parent_id]=[];
-    ptc[l.parent_id].push(l);
+    const child=S.nodes.find(n=>n.id===l.child_id);
+    const parent=S.nodes.find(n=>n.id===l.parent_id);
+    if(child&&parent){
+      if(!ptc[l.child_id])ptc[l.child_id]=[];
+      ptc[l.child_id].push({parent,link:l});
+    }
   });
   
-  // BOM Level format (matches Axon import/export)
-  let csv='#,Level,Component,Part Number,Qty,Status,Fastener,F.Qty,Loctite,Torque\n';
-  let idx=1;
-  
-  function addRow(node,level,link){
-    const indent='  '.repeat(level-1);
-    csv+=[
-      idx++,
-      'L'+level,
-      csvVal(indent+node.name),
-      csvVal(node.part_number||''),
-      node.qty||1,
-      node.status||'NOT_STARTED',
-      csvVal(link?.fastener||''),
-      link?.qty||'',
-      link?.loctite?'LT-'+link.loctite:'',
-      link?.torque_value||''
-    ].join(',')+'\n';
-    
-    // Recurse into children
-    const childLinks=ptc[node.id]||[];
-    childLinks.forEach(cl=>{
-      const childNode=S.nodes.find(n=>n.id===cl.child_id);
-      if(childNode)addRow(childNode,level+1,cl);
-    });
-  }
-  
-  // Start from root nodes
-  const roots=S.nodes.filter(n=>n.goesInto.length===0);
-  roots.forEach(r=>addRow(r,1,null));
+  let csv='child,parent,child_pn,fastener,qty,loctite,torque\n';
+  S.nodes.forEach(n=>{
+    const parentLinks=ptc[n.id]||[];
+    if(parentLinks.length===0){
+      // Root node — no parent
+      csv+=csvVal(n.name)+',,'+ csvVal(n.part_number||'')+',,,,\n';
+    }else{
+      parentLinks.forEach(pl=>{
+        csv+=csvVal(n.name)+','+csvVal(pl.parent.name)+','+csvVal(n.part_number||'')+','+
+          csvVal(pl.link.fastener||'')+','+(pl.link.qty||1)+','+
+          csvVal(pl.link.loctite||'')+','+(pl.link.torque_value||'')+'\n';
+      });
+    }
+  });
   
   const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=(S.currentAssembly?.name||'assembly')+'_v'+(S.currentVersion?.version||'1')+'_BOM.csv';
+  a.download=(S.currentAssembly?.name||'assembly')+'_v'+(S.currentVersion?.version||'1')+'_tree.csv';
   a.click();
   URL.revokeObjectURL(a.href);
   toast('CSV exported');

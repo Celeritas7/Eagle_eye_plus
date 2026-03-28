@@ -480,69 +480,67 @@ const DB = {
 
   // Clone version (nodes + links)
   async cloneVersion(sourceVersionId, newVersionId, assemblyId){
-    // Load source nodes
+    // 1. Load source nodes by version_id
     const srcNodes = await this.loadNodes(sourceVersionId);
+    if(!srcNodes.length) return { nodesCloned: 0, linksCloned: 0 };
+    const srcNodeIds = new Set(srcNodes.map(n=>n.id));
+    console.log('[Clone] Source nodes: '+srcNodes.length);
     
-    // Load source links — try version_id first, fallback to assembly_id
-    let srcLinks = await this.loadLinks(sourceVersionId);
+    // 2. ALWAYS load ALL links for this assembly — ignore version_id for reading
+    //    Then keep only links connecting our source nodes
+    const{data:rawLinks,error:le}=await sb.from('logi_links').select('*').eq('assembly_id',assemblyId);
+    if(le) console.error('[Clone] Link load error:',le);
+    const allActive=(rawLinks||[]).filter(l=>l.deleted!==true);
+    const srcLinks=allActive.filter(l=>srcNodeIds.has(l.parent_id)&&srcNodeIds.has(l.child_id));
+    console.log('[Clone] Assembly has '+allActive.length+' total links, '+srcLinks.length+' connect source nodes');
     
-    // If still no links, try loading ALL non-deleted links for this assembly
-    if(srcLinks.length===0 && srcNodes.length>0){
-      console.warn('No links found for version, trying assembly-wide fallback');
-      const{data:allLinks}=await sb.from('logi_links').select('*').eq('assembly_id',assemblyId);
-      srcLinks=(allLinks||[]).filter(l=>l.deleted!==true);
+    // 3. Auto-repair: tag unversioned source links
+    let repaired=0;
+    for(const l of srcLinks){
+      if(!l.version_id){
+        await sb.from('logi_links').update({version_id:sourceVersionId}).eq('id',l.id);
+        repaired++;
+      }
     }
+    if(repaired) console.log('[Clone] Auto-repaired '+repaired+' unversioned links');
     
-    console.log('Clone: '+srcNodes.length+' nodes, '+srcLinks.length+' links to clone');
-    
-    // Clone nodes with ID mapping
+    // 4. Clone nodes
     const idMap = new Map();
     for(const n of srcNodes){
-      const clone = {
-        assembly_id: assemblyId,
-        version_id: newVersionId,
-        name: n.name,
-        part_number: n.part_number,
-        status: n.status || 'NOT_STARTED',
-        qty: n.qty || 1,
-        group_num: n.group_num || 0,
-        sequence_num: n.sequence_num || 0,
-        sequence_tag: n.sequence_tag || null,
-        notes: n.notes || null,
-        x: n.x, y: n.y,
-        tree_y: n.tree_y || null,
-        is_locked: n.is_locked || false,
-        deleted: false
-      };
-      const created = await this.createNode(clone);
-      idMap.set(n.id, created.id);
+      try{
+        const created = await this.createNode({
+          assembly_id:assemblyId, version_id:newVersionId,
+          name:n.name, part_number:n.part_number,
+          status:n.status||'NOT_STARTED', qty:n.qty||1,
+          group_num:n.group_num||0, sequence_num:n.sequence_num||0,
+          sequence_tag:n.sequence_tag||null, notes:n.notes||null,
+          x:n.x, y:n.y, tree_y:n.tree_y||null,
+          is_locked:n.is_locked||false, deleted:false
+        });
+        idMap.set(n.id, created.id);
+      }catch(e){console.error('[Clone] Node error:',n.name,e)}
     }
     
-    // Clone links with remapped IDs
-    let linksCloned = 0, linksSkipped = 0;
+    // 5. Clone links with remapped IDs
+    let linksCloned=0, linksSkipped=0;
     for(const l of srcLinks){
-      const newParent = idMap.get(l.parent_id);
-      const newChild = idMap.get(l.child_id);
-      if(!newParent || !newChild){ linksSkipped++; continue; }
-      await this.createLink({
-        assembly_id: assemblyId,
-        version_id: newVersionId,
-        parent_id: newParent,
-        child_id: newChild,
-        fastener: l.fastener || null,
-        qty: l.qty || 1,
-        loctite: l.loctite || null,
-        torque_value: l.torque_value || null,
-        torque_unit: l.torque_unit || null,
-        label_position: l.label_position || null,
-        deleted: false
-      });
-      linksCloned++;
+      const np=idMap.get(l.parent_id), nc=idMap.get(l.child_id);
+      if(!np||!nc){linksSkipped++;continue}
+      try{
+        await this.createLink({
+          assembly_id:assemblyId, version_id:newVersionId,
+          parent_id:np, child_id:nc,
+          fastener:l.fastener||null, qty:l.qty||1,
+          loctite:l.loctite||null, torque_value:l.torque_value||null,
+          torque_unit:l.torque_unit||null, label_position:l.label_position||null,
+          deleted:false
+        });
+        linksCloned++;
+      }catch(e){console.error('[Clone] Link error:',e);linksSkipped++}
     }
     
-    if(linksSkipped>0) console.warn('Clone: '+linksSkipped+' links skipped (parent/child not in source nodes)');
-    
-    return { nodesCloned: srcNodes.length, linksCloned };
+    console.log('[Clone] DONE: '+idMap.size+' nodes, '+linksCloned+' links ('+linksSkipped+' skipped)');
+    return { nodesCloned: idMap.size, linksCloned };
   },
 
   // Save node positions
@@ -936,7 +934,11 @@ async function createNewVersion(){
         // Clone if source selected
         if(sourceId){
           const result=await DB.cloneVersion(sourceId,newVer.id,S.currentAssembly.id);
-          toast(`v${ver} created (${result.nodesCloned} nodes, ${result.linksCloned} links cloned)`);
+          if(result.linksCloned===0 && result.nodesCloned>1){
+            toast(`⚠️ v${ver}: ${result.nodesCloned} nodes cloned but 0 links — check browser console`,'err');
+          }else{
+            toast(`v${ver} created (${result.nodesCloned} nodes, ${result.linksCloned} links)`);
+          }
         }else{
           toast(`v${ver} created (empty)`);
         }
