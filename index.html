@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
   :root {
     --bg: #0a0e1a;
@@ -18,7 +18,7 @@
     --border-strong: #3a4360;
     --text: #e8ecf5;
     --text-dim: #8892b0;
-    --text-faint: #5a6480;
+    --text-faint: #8088a8;
     --accent: #f59e0b;
     --accent-2: #ea580c;
     --accent-dim: #b97509;
@@ -36,7 +36,7 @@
       var(--bg);
     color: var(--text);
     min-height: 100vh;
-    font-size: 13px;
+    font-size: 14px;
     overflow-x: hidden;
   }
 
@@ -72,7 +72,7 @@
   }
   .tag {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;
     padding: 3px 7px;
     border: 1px solid var(--border-strong);
     border-radius: 3px;
@@ -90,7 +90,7 @@
     border: 1px solid rgba(168, 85, 247, 0.25);
     padding: 4px 10px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--purple);
     font-family: 'JetBrains Mono', monospace;
     font-weight: 500;
@@ -98,7 +98,7 @@
   }
   .axon-badge::before {
     content: '⚡';
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .user-area {
@@ -115,7 +115,7 @@
     padding: 4px 10px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     font-family: 'JetBrains Mono', monospace;
     text-transform: uppercase;
@@ -129,9 +129,18 @@
     box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
     animation: pulse 2.4s ease-in-out infinite;
   }
+  .db-indicator.checking .dot {
+    background: var(--text-faint);
+    box-shadow: none;
+  }
+  .db-indicator.disconnected {
+    color: var(--red);
+    border-color: rgba(239, 68, 68, 0.4);
+  }
   .db-indicator.disconnected .dot {
     background: var(--red);
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+    animation: none;
   }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -160,9 +169,16 @@
   .login-btn:active {
     transform: translateY(0);
   }
-  .login-btn img {
+  .login-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+    transform: none;
+    box-shadow: none;
+  }
+  .login-btn svg {
     width: 14px;
     height: 14px;
+    flex-shrink: 0;
   }
 
   .user-badge {
@@ -174,7 +190,14 @@
     border-radius: 4px;
     font-size: 11px;
   }
+  .user-badge #userName {
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .user-badge .dot {
+    flex-shrink: 0;
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -188,7 +211,7 @@
   .user-badge.admin .dot { background: var(--accent); box-shadow: 0 0 6px rgba(245,158,11,0.5); }
   .user-badge .role {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     opacity: 0.75;
@@ -197,18 +220,24 @@
     border-left: 1px solid var(--border-strong);
   }
   .user-badge.admin .role { border-left-color: rgba(245,158,11,0.3); }
-  .user-badge button {
+  .signout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 10px;
     background: transparent;
-    border: none;
-    color: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    color: var(--text-dim);
     cursor: pointer;
-    opacity: 0.5;
-    font-size: 14px;
-    line-height: 1;
-    margin-left: 2px;
-    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    transition: color 0.15s, border-color 0.15s;
   }
-  .user-badge button:hover { opacity: 1; }
+  .signout-btn:hover { color: var(--text); border-color: var(--text-faint); }
+  .signout-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 
   /* MAIN */
   main {
@@ -242,7 +271,7 @@
 
   .phase-tag {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--accent);
     background: rgba(245, 158, 11, 0.1);
     border: 1px solid rgba(245, 158, 11, 0.25);
@@ -283,7 +312,7 @@
   }
 
   .checks h3 {
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--text-faint);
@@ -326,12 +355,13 @@
   }
   .check-row .meta {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;
     color: var(--text-faint);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
   .check-row .meta.ok { color: var(--green); }
+  .check-row .meta.error { color: var(--red); }
   .check-row .meta.admin { color: var(--accent); }
 
   .upcoming {
@@ -344,7 +374,7 @@
     color: var(--text-faint);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    font-size: 9px;
+    font-size: 11px;
     margin-bottom: 6px;
     font-weight: 600;
   }
@@ -353,6 +383,40 @@
     font-size: 12px;
   }
   .upcoming .next .accent { color: var(--accent); }
+
+  .spinner {
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 18px;
+    border: 2px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-panel {
+    margin: 24px auto 0;
+    max-width: 420px;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.06);
+    border-radius: 8px;
+    padding: 16px 18px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .error-panel strong { color: var(--red); display: block; margin-bottom: 4px; }
+  .error-panel button {
+    margin-top: 12px;
+    padding: 8px 14px;
+    background: var(--bg-elev2);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
 
   /* TOAST */
   .toast-container {
@@ -378,6 +442,7 @@
     animation: toast-in 0.25s ease-out;
     pointer-events: auto;
     min-width: 200px;
+    max-width: calc(100vw - 32px);
     text-align: center;
   }
   .toast.success { border-color: rgba(34,197,94,0.4); color: var(--green); }
@@ -388,7 +453,13 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
   .hidden { display: none !important; }
+  body:not(.is-admin) .admin-only { display: none !important; }
 
   /* MOBILE */
   @media (max-width: 640px) {
@@ -396,7 +467,15 @@
     header h1 { font-size: 14px; }
     header .tag { display: none; }
     .axon-badge { display: none; }
-    .db-indicator { display: none; }
+    .db-indicator { padding: 8px; }
+    .db-indicator .label { display: none; }
+    .user-badge { padding: 4px 4px 4px 10px; }
+    .user-area, .user-badge { min-width: 0; }
+    .user-badge #userName { max-width: none; min-width: 0; }
+    header h1 { flex-shrink: 0; }
+    .user-badge .role { display: none; }
+    .signout-btn { padding: 0 9px; min-width: 32px; justify-content: center; }
+    .signout-btn .label { display: none; }
     .splash h2 { font-size: 22px; }
     .splash .icon { width: 72px; height: 72px; }
     main { padding: 40px 18px 80px; }
@@ -427,28 +506,43 @@
   <div class="axon-badge">Reading from Axon</div>
 
   <div class="user-area">
-    <div id="dbIndicator" class="db-indicator">
-      <span class="dot"></span>
-      <span>Supabase</span>
+    <div id="dbIndicator" class="db-indicator checking" role="status" title="Checking database connection…">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="label" id="dbLabel">Checking…</span>
     </div>
 
-    <button id="loginBtn" class="login-btn" onclick="handleLogin()">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-      Sign in with Google
-    </button>
 
     <div id="userBadge" class="user-badge hidden">
-      <span class="dot"></span>
+      <span class="dot" aria-hidden="true"></span>
       <span id="userName"></span>
       <span class="role" id="userRole"></span>
-      <button onclick="handleLogout()" title="Sign out">×</button>
+      <button class="signout-btn" onclick="handleLogout()" aria-label="Sign out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="label">Sign out</span>
+      </button>
     </div>
   </div>
 </header>
 
 <main>
+  <!-- Boot / loading splash -->
+  <div id="splashLoading" class="splash" role="status">
+    <div class="spinner" aria-hidden="true"></div>
+    <p class="subtitle">Loading EagleEye…</p>
+  </div>
+
+  <!-- Fatal error splash (library or network failure) -->
+  <div id="splashError" class="splash hidden">
+    <h2>Can't reach EagleEye</h2>
+    <div class="error-panel" role="alert">
+      <strong id="errorTitle">Connection problem</strong>
+      <span id="errorDetail">Check your network connection and try again.</span>
+      <div><button onclick="location.reload()">Retry</button></div>
+    </div>
+  </div>
+
   <!-- Signed-out splash -->
-  <div id="splashSignedOut" class="splash">
+  <div id="splashSignedOut" class="splash hidden">
     <div class="icon">
       <svg viewBox="0 0 88 88" width="88" height="88" aria-hidden="true">
         <defs>
@@ -464,11 +558,14 @@
         <circle cx="44" cy="44" r="3.4" fill="#0a0e1a"/>
       </svg>
     </div>
-    <span class="phase-tag">Phase 1.1 · Auth Shell</span>
     <h2>Welcome to EagleEye</h2>
     <p class="subtitle">
       Production unit tracking for assemblies built in Axon. Sign in with your Telexistence Google account to continue.
     </p>
+    <button class="login-btn" id="loginBtn" style="margin-top: 24px; padding: 11px 18px; font-size: 14px;" onclick="handleLogin()">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      <span id="loginLabel">Sign in with Google</span>
+    </button>
   </div>
 
   <!-- Signed-in splash -->
@@ -488,31 +585,31 @@
         <circle cx="44" cy="44" r="3.4" fill="#0a0e1a"/>
       </svg>
     </div>
-    <span class="phase-tag">Phase 1.1 · Shell Ready</span>
+    <span class="phase-tag admin-only">Phase 1.1 · Shell Ready</span>
     <h2 id="welcomeMsg">Welcome back</h2>
     <p class="subtitle">
-      Auth, Supabase, and role detection are working. Projects and units come online in the next sub-phases.
+      You're signed in. Your projects and units will appear here soon.
     </p>
 
     <div class="checks">
       <h3>System Status</h3>
       <div class="check-row">
-        <span class="glyph">✓</span>
-        <span>Supabase connection</span>
-        <span class="meta ok" id="supabaseStatus">connected</span>
+        <span class="glyph pending" id="supabaseGlyph" aria-hidden="true">…</span>
+        <span>Database connection</span>
+        <span class="meta" id="supabaseStatus">checking</span>
       </div>
       <div class="check-row">
-        <span class="glyph">✓</span>
-        <span>Google OAuth session</span>
+        <span class="glyph" aria-hidden="true">✓</span>
+        <span>Google sign-in</span>
         <span class="meta ok">active</span>
       </div>
       <div class="check-row">
-        <span class="glyph">✓</span>
-        <span>Role detection</span>
+        <span class="glyph" aria-hidden="true">✓</span>
+        <span>Your role</span>
         <span class="meta" id="roleStatus">—</span>
       </div>
 
-      <div class="upcoming">
+      <div class="upcoming admin-only">
         <div class="label">Up next</div>
         <div class="next"><span class="accent">1.2</span> · Schema migration — eagle_units, eagle_unit_progress</div>
       </div>
@@ -520,7 +617,7 @@
   </div>
 </main>
 
-<div class="toast-container" id="toastContainer"></div>
+<div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
 <script>
 // ============================================================
@@ -530,8 +627,14 @@ const SUPABASE_URL = 'https://wylxvmkcrexwfpjpbhyy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bHh2bWtjcmV4d2ZwanBiaHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2MzkxMDYsImV4cCI6MjA4NDIxNTEwNn0.6Bxo42hx4jwlJGWnfjiTpiDUsYfc1QLTN3YtrU1efak';
 const ADMIN_EMAIL = 'mangaonkaraniket@gmail.com';
 
-// Use 'sb' to avoid UMD CDN collision with window.supabase library namespace
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Captured before createClient() consumes the OAuth params from the URL
+const RETURNING_FROM_OAUTH = /[#&?](access_token|code)=/.test(location.hash + location.search);
+
+// Use 'sb' to avoid UMD CDN collision with window.supabase library namespace.
+// Null when the library failed to load (CDN blocked, offline) — init() shows an error splash.
+const sb = window.supabase?.createClient
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
 
 // ============================================================
 // STATE
@@ -570,35 +673,46 @@ async function testConnection() {
 
 function setDbIndicator(connected) {
   const ind = document.getElementById('dbIndicator');
+  ind.classList.remove('checking');
   ind.classList.toggle('disconnected', !connected);
+  ind.title = connected ? 'Database connected' : 'Database unreachable';
+  document.getElementById('dbLabel').textContent = connected ? 'Online' : 'Offline';
+
   const statusEl = document.getElementById('supabaseStatus');
-  if (statusEl) {
-    statusEl.textContent = connected ? 'connected' : 'disconnected';
-    statusEl.classList.toggle('ok', connected);
-  }
+  statusEl.textContent = connected ? 'connected' : 'unreachable';
+  statusEl.classList.toggle('ok', connected);
+  statusEl.classList.toggle('error', !connected);
+
+  const glyph = document.getElementById('supabaseGlyph');
+  glyph.classList.remove('pending');
+  glyph.classList.toggle('error', !connected);
+  glyph.textContent = connected ? '✓' : '!';
 }
 
 // ============================================================
 // AUTH
 // ============================================================
-async function checkAuth() {
+async function getInitialUser() {
   try {
     const { data: { session }, error } = await sb.auth.getSession();
     if (error) {
       console.error('Get session error:', error);
-      return;
+      return null;
     }
-    if (session?.user) {
-      handleAuthUser(session.user, /* fromInit */ true);
-    }
+    return session?.user ?? null;
   } catch (e) {
     console.error('Auth check failed:', e);
+    return null;
   }
+}
 
+function listenForAuthChanges() {
   // Listen for changes (login/logout/token refresh)
   sb.auth.onAuthStateChange((event, session) => {
     console.log('Auth event:', event);
     if (event === 'SIGNED_IN' && session?.user) {
+      // supabase-js can re-emit SIGNED_IN (e.g. on tab refocus) — skip if user is unchanged
+      if (currentUser?.id === session.user.id) return;
       handleAuthUser(session.user, /* fromInit */ false);
     } else if (event === 'SIGNED_OUT') {
       handleSignOut();
@@ -617,7 +731,7 @@ function handleAuthUser(user, fromInit) {
   // Race-condition guard: compute admin status in a local first, then assign
   const isAdminLocal = email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
-  currentUser = { email, name };
+  currentUser = { id: user.id, email, name };
   isAdmin = isAdminLocal;
 
   showSignedInUI(name, email, isAdminLocal);
@@ -635,7 +749,14 @@ function handleSignOut() {
   toast('Signed out', 'info');
 }
 
+function setLoginPending(pending) {
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = pending;
+  document.getElementById('loginLabel').textContent = pending ? 'Redirecting to Google…' : 'Sign in with Google';
+}
+
 async function handleLogin() {
+  setLoginPending(true);
   try {
     const { error } = await sb.auth.signInWithOAuth({
       provider: 'google',
@@ -646,11 +767,13 @@ async function handleLogin() {
     if (error) {
       console.error('OAuth start error:', error);
       toast('Sign-in failed: ' + error.message, 'error');
+      setLoginPending(false);
     }
     // User redirects to Google; on return, onAuthStateChange handles it
   } catch (e) {
     console.error('Login failed:', e);
     toast('Sign-in failed', 'error');
+    setLoginPending(false);
   }
 }
 
@@ -672,18 +795,23 @@ async function handleLogout() {
 // ============================================================
 // UI
 // ============================================================
+const SPLASHES = ['splashLoading', 'splashError', 'splashSignedOut', 'splashSignedIn'];
+
+function showSplash(id) {
+  SPLASHES.forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
+}
+
 function showSignedInUI(name, email, admin) {
-  document.getElementById('loginBtn').classList.add('hidden');
+  document.body.classList.toggle('is-admin', admin);
 
   const badge = document.getElementById('userBadge');
   badge.classList.remove('hidden');
   badge.classList.toggle('admin', admin);
   document.getElementById('userName').textContent = name;
-  document.getElementById('userName').title = email;
+  document.getElementById('userName').title = `${name} · ${email}`;
   document.getElementById('userRole').textContent = admin ? 'admin' : 'operator';
 
-  document.getElementById('splashSignedOut').classList.add('hidden');
-  document.getElementById('splashSignedIn').classList.remove('hidden');
+  showSplash('splashSignedIn');
   document.getElementById('welcomeMsg').textContent = `Welcome, ${name}`;
 
   const roleEl = document.getElementById('roleStatus');
@@ -693,10 +821,16 @@ function showSignedInUI(name, email, admin) {
 }
 
 function showSignedOutUI() {
-  document.getElementById('loginBtn').classList.remove('hidden');
+  document.body.classList.remove('is-admin');
   document.getElementById('userBadge').classList.add('hidden');
-  document.getElementById('splashSignedOut').classList.remove('hidden');
-  document.getElementById('splashSignedIn').classList.add('hidden');
+  setLoginPending(false);
+  showSplash('splashSignedOut');
+}
+
+function showFatalError(title, detail) {
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorDetail').textContent = detail;
+  showSplash('splashError');
 }
 
 // ============================================================
@@ -705,13 +839,28 @@ function showSignedOutUI() {
 async function init() {
   console.log('EagleEye Phase 1.1 booting…');
 
-  const connected = await testConnection();
+  if (!sb) {
+    setDbIndicator(false);
+    showFatalError('App failed to load', 'A required component could not be downloaded. Check your network connection and try again.');
+    return;
+  }
+
+  // Session and DB check run in parallel so the right screen appears as soon as possible
+  const [user, connected] = await Promise.all([getInitialUser(), testConnection()]);
+
   setDbIndicator(connected);
   if (!connected) {
     toast('Database connection failed', 'error');
   }
 
-  await checkAuth();
+  if (user) {
+    // Welcome toast only right after the Google redirect, not on a plain reload
+    handleAuthUser(user, /* fromInit */ !RETURNING_FROM_OAUTH);
+  } else {
+    showSignedOutUI();
+  }
+
+  listenForAuthChanges();
 
   console.log('EagleEye ready');
 }
