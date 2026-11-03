@@ -522,16 +522,18 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
+<script src="https://celeritas7.github.io/Akatsuki/js/akatsuki-broadcast.js"></script>
 <script>
 // ============================================================
 // CONFIG
 // ============================================================
 const SUPABASE_URL = 'https://wylxvmkcrexwfpjpbhyy.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5bHh2bWtjcmV4d2ZwanBiaHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2MzkxMDYsImV4cCI6MjA4NDIxNTEwNn0.6Bxo42hx4jwlJGWnfjiTpiDUsYfc1QLTN3YtrU1efak';
+const SUPABASE_ANON_KEY = 'sb_publishable_e3pDOuxIdstaC7s0a680kQ_R10TrAyv';
 const ADMIN_EMAIL = 'mangaonkaraniket@gmail.com';
 
 // Use 'sb' to avoid UMD CDN collision with window.supabase library namespace
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (window.AkatsukiBroadcast) window.AkatsukiBroadcast(sb, 'eagle_eye_plus').start();
 
 // ============================================================
 // STATE
